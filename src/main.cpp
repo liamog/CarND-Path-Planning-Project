@@ -8,6 +8,7 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
+#include "spline.h"
 
 using namespace std;
 
@@ -18,6 +19,38 @@ using json = nlohmann::json;
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
+// Speed conversion
+double mph2mps(double mph) { return mph * 0.44704; }
+
+// Lane to lateral distance (frenet)
+double lane2frenet_d(int lane) { return lane * 4.0 +2.0;}
+
+void map2car(double car_x_map, double car_y_map, double psi, double input_x,
+              double input_y, double *car_x, double *car_y) {
+  float s = sin(-psi);
+  float c = cos(-psi);
+  // Move to origin
+  float x = (input_x - car_x_map);
+  float y = (input_y - car_y_map);
+
+  // Rotate by psi
+  *car_x = (x * c) - (y * s);
+  *car_y = (x * s) + (y * c);
+}
+
+void car2map(double car_x, double car_y, double psi, double input_x,
+             double input_y, double *car_map_x, double *car_map_y) {
+  float s = sin(psi);
+  float c = cos(psi);
+
+  // Rotate
+  float x_rot = input_x * c - input_y * s;
+  float y_rot = input_x * s + input_y * c;
+
+  // Move relative to car pos.
+  *car_map_x = car_x + x_rot;
+  *car_map_y = car_y + y_rot;
+}
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -153,6 +186,8 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s,
 
 int main() {
   uWS::Hub h;
+  double reference_velocity_mps = mph2mps(49.5);  // 49.5 mph in m/s
+  int lane = 1;
 
   // Load up map values for waypoint's x,y,s and d normalized normal vectors
   vector<double> map_waypoints_x;
@@ -187,6 +222,7 @@ int main() {
     map_waypoints_dx.push_back(d_x);
     map_waypoints_dy.push_back(d_y);
   }
+
 
   h.onMessage([&map_waypoints_x, &map_waypoints_y, &map_waypoints_s,
                &map_waypoints_dx,
@@ -231,6 +267,32 @@ int main() {
 
           vector<double> next_x_vals;
           vector<double> next_y_vals;
+
+          // Create a reference set of waypoints that includes the current
+          // car position.
+
+          vector<double> ref_x_vals;
+          vector<double> ref_y_vals;
+
+          ref_x_vals.push_back(car_x);
+          ref_y_vals.push_back(car_y);
+
+
+          double spacing = 30.0;
+          for (int ii = 1; ii <= 3; ii++) {
+
+            vector<double> point  = getXY(car_s + (spacing * ii),
+                                          lane2frenet_d(lane),
+                                          map_waypoints_s,
+                                          map_waypoints_x,
+                                          map_waypoints_y);
+            ref_x_vals.push_back(point[0]);
+            ref_y_vals.push_back(point[1]);
+          }
+
+
+          
+
 
           double dist_inc = 0.5;
           for (int ii = 1; ii < 50; ii++) {
