@@ -5,6 +5,8 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include "utils.h"
+
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
@@ -15,42 +17,7 @@ using namespace std;
 // for convenience
 using json = nlohmann::json;
 
-// For converting back and forth between radians and degrees.
-constexpr double pi() { return M_PI; }
-double deg2rad(double x) { return x * pi() / 180; }
-double rad2deg(double x) { return x * 180 / pi(); }
-// Speed conversion
-double mph2mps(double mph) { return mph * 0.44704; }
 
-// Lane to lateral distance (frenet)
-double lane2frenet_d(int lane) { return lane * 4.0 +2.0;}
-
-void map2car(double car_x_map, double car_y_map, double psi, double input_x,
-              double input_y, double *car_x, double *car_y) {
-  float s = sin(-psi);
-  float c = cos(-psi);
-  // Move to origin
-  float x = (input_x - car_x_map);
-  float y = (input_y - car_y_map);
-
-  // Rotate by psi
-  *car_x = (x * c) - (y * s);
-  *car_y = (x * s) + (y * c);
-}
-
-void car2map(double car_x, double car_y, double psi, double input_x,
-             double input_y, double *car_map_x, double *car_map_y) {
-  float s = sin(psi);
-  float c = cos(psi);
-
-  // Rotate
-  float x_rot = input_x * c - input_y * s;
-  float y_rot = input_x * s + input_y * c;
-
-  // Move relative to car pos.
-  *car_map_x = car_x + x_rot;
-  *car_map_y = car_y + y_rot;
-}
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -98,9 +65,9 @@ int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x,
   double heading = atan2((map_y - y), (map_x - x));
 
   double angle = fabs(theta - heading);
-  angle = min(2 * pi() - angle, angle);
+  angle = min(2 * M_PI - angle, angle);
 
-  if (angle > pi() / 4) {
+  if (angle > M_PI_4) {
     closestWaypoint++;
     if (closestWaypoint == maps_x.size()) {
       closestWaypoint = 0;
@@ -176,7 +143,7 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s,
   double seg_x = maps_x[prev_wp] + seg_s * cos(heading);
   double seg_y = maps_y[prev_wp] + seg_s * sin(heading);
 
-  double perp_heading = heading - pi() / 2;
+  double perp_heading = heading - M_PI_2;
 
   double x = seg_x + d * cos(perp_heading);
   double y = seg_y + d * sin(perp_heading);
@@ -224,7 +191,7 @@ int main() {
   }
 
 
-  h.onMessage([&map_waypoints_x, &map_waypoints_y, &map_waypoints_s,
+  h.onMessage([lane, &map_waypoints_x, &map_waypoints_y, &map_waypoints_s,
                &map_waypoints_dx,
                &map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data,
                                   size_t length, uWS::OpCode opCode) {
@@ -291,8 +258,9 @@ int main() {
           }
 
 
-          
+          for (int ii =0; ii < ref_x_vals.size(); ++ii) {
 
+          }
 
           double dist_inc = 0.5;
           for (int ii = 1; ii < 50; ii++) {
