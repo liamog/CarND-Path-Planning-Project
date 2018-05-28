@@ -6,28 +6,29 @@
 
 #include <vector>
 
-struct Point {
-  Point();
-  Point(std::vector<double> xy );
-  Point(double x, double y);
+#include "point.h"
 
-  std::vector<double> ToVector();
-
-  double x = 0.0;
-  double y = 0.0;
-};
-
-
-double deg2rad(double x);
-double rad2deg(double x);
+double deg_to_rad(double x);
+double rad_to_deg(double x);
 // Speed conversion
 double mph2mps(double mph);
 
 // Lane to lateral distance (frenet)
-double lane2frenet_d(int lane);
+double lane_to_frenet_d(int lane);
+int frenet_d_to_lane(double d);
 
 Point map2car(const Point &car_in_map, double psi, const Point &input);
 
 Point car2map(const Point &car_in_map, double psi, const Point &input);
+
+double distance(double x1, double y1, double x2, double y2);
+
+Point getXY(double s, double d, const std::vector<double> &maps_s,
+            const std::vector<double> &maps_x,
+            const std::vector<double> &maps_y);
+
+std::vector<double> getFrenet(double x, double y, double theta,
+                         const std::vector<double> &maps_x,
+                         const std::vector<double> &maps_y);
 
 #endif //PATH_PLANNING_UTILS_H

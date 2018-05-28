@@ -13,7 +13,7 @@ endif (APPLE)
 set(CXX_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS, "${CXX_FLAGS}")
 
-set(sources src/main.cpp src/utils.cpp src/utils.h)
+set(sources src/main.cpp src/utils.cpp src/utils.h src/generate_path.cpp src/generate_path.h src/car_state.cpp src/car_state.h src/point.h src/point.cpp)
 
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin") 
