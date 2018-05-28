@@ -6,6 +6,7 @@
 
 #include <vector>
 
+#include "map_state.h"
 #include "point.h"
 
 double deg_to_rad(double x);
@@ -23,9 +24,7 @@ Point car2map(const Point &car_in_map, double psi, const Point &input);
 
 double distance(double x1, double y1, double x2, double y2);
 
-Point getXY(double s, double d, const std::vector<double> &maps_s,
-            const std::vector<double> &maps_x,
-            const std::vector<double> &maps_y);
+Point getXY(double s, double d, const MapState &map_state);
 
 std::vector<double> getFrenet(double x, double y, double theta,
                          const std::vector<double> &maps_x,

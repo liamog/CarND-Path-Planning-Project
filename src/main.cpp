@@ -13,13 +13,13 @@
 
 #include "car_state.h"
 #include "generate_path.h"
+#include "map_state.h"
 #include "spline.h"
 
 using namespace std;
 
 // for convenience
 using json = nlohmann::json;
-
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -43,44 +43,11 @@ int main() {
 
   int lane = 1;
 
-  // Load up map values for waypoint's x,y,s and d normalized normal vectors
-  vector<double> map_waypoints_x;
-  vector<double> map_waypoints_y;
-  vector<double> map_waypoints_s;
-  vector<double> map_waypoints_dx;
-  vector<double> map_waypoints_dy;
+  // Load map state
+  MapState map_state;
+  map_state.LoadMapState("../data/highway_map.csv");
 
-  // Waypoint map to read from
-  string map_file_ = "../data/highway_map.csv";
-  // The max s value before wrapping around the track back to 0
-  double max_s = 6945.554;
-
-  ifstream in_map_(map_file_.c_str(), ifstream::in);
-
-  string line;
-  while (getline(in_map_, line)) {
-    istringstream iss(line);
-    double x;
-    double y;
-    float s;
-    float d_x;
-    float d_y;
-    iss >> x;
-    iss >> y;
-    iss >> s;
-    iss >> d_x;
-    iss >> d_y;
-    map_waypoints_x.push_back(x);
-    map_waypoints_y.push_back(y);
-    map_waypoints_s.push_back(s);
-    map_waypoints_dx.push_back(d_x);
-    map_waypoints_dy.push_back(d_y);
-  }
-
-
-  h.onMessage([lane, &map_waypoints_x, &map_waypoints_y, &map_waypoints_s,
-                  &map_waypoints_dx,
-                  &map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data,
+  h.onMessage([lane, &map_state](uWS::WebSocket<uWS::SERVER> ws, char *data,
                                      size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -134,9 +101,7 @@ int main() {
           Path reference_path_map = GenerateReferencePath(prev_path_map,
                                                           sdc_state,
                                                           1,
-                                                          map_waypoints_s,
-                                                          map_waypoints_x,
-                                                          map_waypoints_y);
+                                                          map_state);
 
           Path reference_path_car = MapPathToCarPath(sdc_state, reference_path_map);
           tk::spline s;
@@ -149,9 +114,7 @@ int main() {
           vector<double> next_y_vals;
           double dist_inc = 0.5;
           for (int ii = 1; ii < 50; ii++) {
-            Point point = getXY(car_s + ii * dist_inc, car_d, map_waypoints_s,
-                                map_waypoints_x, map_waypoints_y);
-
+            Point point = getXY(car_s + ii * dist_inc, car_d, map_state);
             next_x_vals.push_back(point.x);
             next_y_vals.push_back(point.y);
           }

@@ -9,6 +9,7 @@
 
 #include "utils.h"
 #include "car_state.h"
+#include "map_state.h"
 
 typedef std::vector<Point> Path;
 
@@ -34,9 +35,7 @@ Path PointsFromVectors(const std::vector<double> &x,
 Path GenerateReferencePath(const Path &prev_path,
                            const CarState &car_state,
                            const int target_lane,
-                           const std::vector<double> &maps_s,
-                           const std::vector<double> &maps_x,
-                           const std::vector<double> &maps_y);
+                           const MapState &map_state);
 
 
 #endif //PATH_PLANNING_GENERATEPATH_H

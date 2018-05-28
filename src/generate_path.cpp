@@ -57,9 +57,7 @@ Path PointsFromVectors(const std::vector<double> &x,
 vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
                                     const CarState &car_state,
                                     const int target_lane,
-                                    const std::vector<double> &maps_s,
-                                    const std::vector<double> &maps_x,
-                                    const std::vector<double> &maps_y) {
+                                    const MapState &map_state) {
   // Create a reference set of waypoints that includes the current
   // car position.
   vector<Point> path_points;
@@ -80,9 +78,7 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
   for (int ii = 1; ii <= 3; ii++) {
     Point point = getXY(car_state.s() + (spacing * ii),
                         lane_to_frenet_d(target_lane),
-                        maps_s,
-                        maps_x,
-                        maps_y);
+                        map_state);
     path_points.push_back(point);
   }
   return path_points;
