@@ -39,7 +39,7 @@ string hasData(string s) {
 
 int main() {
   uWS::Hub h;
-  double reference_velocity_mps = mph2mps(49.5);  // 49.5 mph in m/s
+  double reference_velocity_mps = mph_to_mps(49.5);  // 49.5 mph in m/s
 
   int lane = 1;
 
@@ -48,7 +48,7 @@ int main() {
   map_state.LoadMapState("../data/highway_map.csv");
 
   h.onMessage([lane, &map_state](uWS::WebSocket<uWS::SERVER> ws, char *data,
-                                     size_t length, uWS::OpCode opCode) {
+                                 size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -70,7 +70,7 @@ int main() {
           double car_y = j[1]["y"];
           double car_s = j[1]["s"];
           double car_d = j[1]["d"];
-          double car_yaw = j[1]["yaw_rad"];
+          double car_yaw = j[1]["yaw"];
           double car_speed = j[1]["speed"];
           CarState sdc_state(car_x, car_y, car_s, car_d, car_yaw, car_speed);
 
@@ -89,40 +89,28 @@ int main() {
           // Sensor Fusion Data, a list of all other cars on the same side of
           // the road.
           std::vector<CarState> others;
-          auto sensor_fusion = j[1]["sensor_fusion"];
-          for (auto other : sensor_fusion) {
-            others.emplace_back(other[0], other[1], other[2], other[3],
-                                other[4], other[5], other[6]);
-          }
+//          auto sensor_fusion = j[1]["sensor_fusion"];
+//          for (auto other : sensor_fusion) {
+//            others.emplace_back(other[0], other[1], other[2], other[3],
+//                                other[4], other[5], other[6]);
+//          }
 
           json msgJson;
 
           // Generate a reference path for the current lane in map co-ordinates.
-          Path reference_path_map = GenerateReferencePath(prev_path_map,
-                                                          sdc_state,
-                                                          1,
-                                                          map_state);
+          Path ref_path_map = GenerateReferencePath(prev_path_map,
+                                                    sdc_state,
+                                                    1,
+                                                    map_state);
+          Path drivable_path = GeneratePathByTimeSamples(ref_path_map,
+                                                         sdc_state,
+                                                         2.0,
+                                                         mph_to_mps(49.5));
 
-          Path reference_path_car = MapPathToCarPath(sdc_state, reference_path_map);
-          tk::spline s;
-          pair<vector<double>, vector<double>> ref= VectorsFromPath(
-              reference_path_car);
-          s.set_points(ref.first, ref.second);
-
-
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
-          double dist_inc = 0.5;
-          for (int ii = 1; ii < 50; ii++) {
-            Point point = getXY(car_s + ii * dist_inc, car_d, map_state);
-            next_x_vals.push_back(point.x);
-            next_y_vals.push_back(point.y);
-          }
-
-          // TODO: define a path made up of (x,y) points that the car will visit
-          // sequentially every .02 seconds
-          msgJson["next_x"] = next_x_vals;
-          msgJson["next_y"] = next_y_vals;
+          std::pair<vector<double>, vector<double>> next = VectorsFromPath(
+              drivable_path);
+          msgJson["next_x"] = next.first;
+          msgJson["next_y"] = next.second;
 
           auto msg = "42[\"control\"," + msgJson.dump() + "]";
 

@@ -37,5 +37,7 @@ Path GenerateReferencePath(const Path &prev_path,
                            const int target_lane,
                            const MapState &map_state);
 
-
+Path GeneratePathByTimeSamples(const Path &ref_path_map,
+                               const CarState &sdc_state,
+                               double accel, double max_speed);
 #endif //PATH_PLANNING_GENERATEPATH_H

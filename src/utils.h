@@ -12,7 +12,7 @@
 double deg_to_rad(double x);
 double rad_to_deg(double x);
 // Speed conversion
-double mph2mps(double mph);
+double mph_to_mps(double mph);
 
 // Lane to lateral distance (frenet)
 double lane_to_frenet_d(int lane);

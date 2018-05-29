@@ -16,7 +16,7 @@ double deg_to_rad(double x) { return x * M_PI / 180; }
 double rad_to_deg(double x) { return x * 180 / M_PI; }
 
 // Speed conversion
-double mph2mps(double mph) { return mph * 0.44704; }
+double mph_to_mps(double mph) { return mph * 0.44704; }
 
 // Lane to lateral distance (frenet)
 double lane_to_frenet_d(int lane) { return lane * 4.0 + 2.0; }
