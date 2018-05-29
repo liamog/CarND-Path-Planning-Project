@@ -27,7 +27,7 @@ vector<Point> MapPathToCarPath(const CarState &car,
   for (const Point &map_point: map_path) {
     car_path.emplace_back(map2car(car.point(), car.yaw_rad(), map_point));
   }
-  DumpPath("MapPathToCarPath", car_path);
+//  DumpPath("MapPathToCarPath", car_path);
   return car_path;
 }
 
@@ -38,7 +38,7 @@ vector<Point> CarPathToMapPath(const CarState &car,
   for (const Point &car_point: car_path) {
     map_path.emplace_back(car2map(car.point(), car.yaw_rad(), car_point));
   }
-  DumpPath("CarPathToMapPath", map_path);
+//  DumpPath("CarPathToMapPath", map_path);
   return map_path;
 }
 
@@ -75,18 +75,11 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
   Path path;
 
 //  if (prev_map_path.size() < 2) {
-//    path.emplace_back(car_state.point().x - cos(car_state.yaw_rad()),
-//                      car_state.point().y - sin(car_state.yaw_rad()));
-//
 //    path.emplace_back(car_state.point());
 //  } else {
 //    path.emplace_back(prev_map_path[0]);
 //    path.emplace_back(prev_map_path[1]);
 //  }
-
-//  path.emplace_back(car_state.point().x - cos(car_state.yaw_rad()),
-//                      car_state.point().y - sin(car_state.yaw_rad()));
-
   path.emplace_back(car_state.point());
 
   // Next create 3 points for the forward path.
@@ -98,17 +91,17 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
                         map_state);
     path.push_back(point);
   }
-  DumpPath("GenerateReferencePath", path);
+//  DumpPath("GenerateReferencePath", path);
   return path;
 }
 
-
-
-
-
 Path GeneratePathByTimeSamples(const Path &ref_path_map,
+                               const Path &prev_path_map,
                                const CarState &sdc_state,
                                double accel, double max_speed) {
+  Path prev_path_car = MapPathToCarPath(sdc_state,
+                                        prev_path_map);
+  DumpPath("prev_path_car", prev_path_car);
   Path reference_path_car = MapPathToCarPath(sdc_state, ref_path_map);
   tk::spline spline;
   pair<vector<double>, vector<double>> ref= VectorsFromPath(
@@ -119,31 +112,41 @@ Path GeneratePathByTimeSamples(const Path &ref_path_map,
   constexpr double kTimeHorizon = 3.0;
   const int kTimeSamples =  kTimeHorizon * 50;
   const double kMaxDistanceHorizon = kTimeHorizon * max_speed;
+  int kNumImmutable = 10;
 
   double v = sdc_state.v();
   // Build a path of way points sampled from the spline waypoints (spatial).
   // so they cover the distance we want to travel in the time step.
   Path time_sampled_path;
+  double x = 0.0, y = 0.0;
   for (int ii=0, jj=0; ii < kTimeSamples ; ++ii) {
+    if (ii < kNumImmutable && ii < prev_path_car.size()) {
+      time_sampled_path.emplace_back(prev_path_car[ii]);
+      v = distance(x,y,prev_path_car[ii].x,prev_path_car[ii].y) / kTimeStep;
+      x = prev_path_car[ii].x;
+      y = prev_path_car[ii].y;
+      continue;
+    }
+
     double target_distance = (v * kTimeStep) +
                        (0.5 * accel * kTimeStep * kTimeStep);
     // First sample the spline with x= our target distance.
     // This gives us too large a jump but we can use this to approximate the
     // curvature at this point as triangle and then use some trig to get the
     // actual x and sample the spline again.
-    double approx_y = spline(target_distance);
-    double theta = atan(approx_y / target_distance);
-    double x = target_distance * cos(theta);
-    double y = spline(x);
+    double approx_y = spline(x + target_distance);
+    double theta = atan((approx_y - y )/ (target_distance - x));
+    x = x + target_distance * cos(theta);
+    y = spline(x);
 
     time_sampled_path.emplace_back(x, y);
     // Update our speed for the next waypoint
     v = std::min(v + accel * kTimeStep, max_speed);
-    cout << "v=" << v
-         << ";tdist=" << target_distance
-         << ";x=" << x
-         <<  ";y=" << y
-         << "|";
+//    cout << "v=" << v
+//         << ";tdist=" << target_distance
+//         << ";x=" << x
+//         <<  ";y=" << y
+//         << "|";
   }
   cout << endl;
   DumpPath("time_sampled_path_car", time_sampled_path);

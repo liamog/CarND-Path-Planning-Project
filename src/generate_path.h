@@ -12,6 +12,7 @@
 #include "map_state.h"
 
 typedef std::vector<Point> Path;
+void DumpPath(const char *name, const Path &path);
 
 Path MapPathToCarPath(const CarState &car,
                                const Path &map_path);
@@ -38,6 +39,7 @@ Path GenerateReferencePath(const Path &prev_path,
                            const MapState &map_state);
 
 Path GeneratePathByTimeSamples(const Path &ref_path_map,
+                               const Path &prev_path_map,
                                const CarState &sdc_state,
                                double accel, double max_speed);
 #endif //PATH_PLANNING_GENERATEPATH_H

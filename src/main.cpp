@@ -83,8 +83,6 @@ int main() {
           auto previous_path_y = j[1]["previous_path_y"];
           Path prev_path_map = PathFromVectors(previous_path_x,
                                                previous_path_y);
-//          Path prev_path_car = MapPathToCarPath(sdc_state,
-//                                                prev_path_map);
 
           // Previous path's end s and d values
           double end_path_s = j[1]["end_path_s"];
@@ -107,9 +105,11 @@ int main() {
                                                     1,
                                                     map_state);
           Path drivable_path = GeneratePathByTimeSamples(ref_path_map,
+                                                         prev_path_map,
                                                          sdc_state,
                                                          8.0,
                                                          mph_to_mps(49.5));
+
 
           std::pair<vector<double>, vector<double>> next = VectorsFromPath(
               drivable_path);

@@ -30,9 +30,11 @@ TEST(TimeSampledPath, GeneratePathByTimeSamples) {
                                              sdc_state.Lane(),
                                              map_state);
 
-  Path ref_path = GeneratePathByTimeSamples(drivable_path, sdc_state,
-                                                 5.0,
-                                                 mph_to_mps(49.5));
+  Path ref_path = GeneratePathByTimeSamples(drivable_path,
+                                            prev_path_map,
+                                            sdc_state,
+                                            5.0,
+                                            mph_to_mps(49.5));
 
 }
 
@@ -45,15 +47,21 @@ TEST(GeneratePaths, GenerateMultipleReferencePath) {
                                              sdc_state.Lane(),
                                              map_state);
 
-  Path drivable_path = GeneratePathByTimeSamples(ref_path, sdc_state,
+  Path drivable_path = GeneratePathByTimeSamples(ref_path,
+                                                 prev_path_map,
+                                                 sdc_state,
                                                  5.0,
                                                  mph_to_mps(49.5));
 
-  Path ref_path2 = GenerateReferencePath(drivable_path, sdc_state,
-                                        sdc_state.Lane(),
-                                        map_state);
+  Path ref_path2 = GenerateReferencePath(drivable_path,
+                                         sdc_state,
+                                         sdc_state.Lane(),
+                                         map_state);
 
-  Path drivable_path2 = GeneratePathByTimeSamples(ref_path2, sdc_state,
-                                                 5.0,
-                                                 mph_to_mps(49.5));
+  drivable_path.erase(drivable_path.begin(), drivable_path.begin() + 3);
+  Path drivable_path2 = GeneratePathByTimeSamples(ref_path2,
+                                                  prev_path_map,
+                                                  sdc_state,
+                                                  5.0,
+                                                  mph_to_mps(49.5));
 }
