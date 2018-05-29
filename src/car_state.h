@@ -6,6 +6,8 @@
 #define PATH_PLANNING_CARSTATE_H
 
 #include "point.h"
+#include "utils.h"
+
 #include <cmath>
 #include <string>
 
@@ -32,6 +34,10 @@ public:
   double v() const { return v_; }
 
   const Point &point() const { return point_;}
+
+  int Lane() const {return frenet_d_to_lane(d_);}
+
+    std::string ToString() const;
 
 private:
   std::string id_;

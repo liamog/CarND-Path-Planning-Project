@@ -6,6 +6,7 @@
 #include "map_state.h"
 
 #include <cmath>
+#include <iostream>
 #include <vector>
 
 using namespace std;

@@ -25,8 +25,8 @@ std::vector<Point> PathFromVectors(const std::vector<double> &x,
 std::pair<std::vector<double>, std::vector<double>> VectorsFromPath(
       const Path &path);
 
-Path PointsFromVectors(const std::vector<double> &x,
-                                     const std::vector<double> &y);
+Path PathFromVectors(const std::vector<double> &x,
+                     const std::vector<double> &y);
 
 
 // Generates a reference path (without taking the speed of the car into account)
