@@ -102,7 +102,57 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
   return path;
 }
 
+
+
+
+
 Path GeneratePathByTimeSamples(const Path &ref_path_map,
+                               const CarState &sdc_state,
+                               double accel, double max_speed) {
+  Path reference_path_car = MapPathToCarPath(sdc_state, ref_path_map);
+  tk::spline spline;
+  pair<vector<double>, vector<double>> ref= VectorsFromPath(
+      reference_path_car);
+  spline.set_points(ref.first, ref.second);
+
+  constexpr double kTimeStep = 1.0 / 50;
+  constexpr double kTimeHorizon = 3.0;
+  const int kTimeSamples =  kTimeHorizon * 50;
+  const double kMaxDistanceHorizon = kTimeHorizon * max_speed;
+
+  double v = sdc_state.v();
+  // Build a path of way points sampled from the spline waypoints (spatial).
+  // so they cover the distance we want to travel in the time step.
+  Path time_sampled_path;
+  for (int ii=0, jj=0; ii < kTimeSamples ; ++ii) {
+    double target_distance = (v * kTimeStep) +
+                       (0.5 * accel * kTimeStep * kTimeStep);
+    // First sample the spline with x= our target distance.
+    // This gives us too large a jump but we can use this to approximate the
+    // curvature at this point as triangle and then use some trig to get the
+    // actual x and sample the spline again.
+    double approx_y = spline(target_distance);
+    double theta = atan(approx_y / target_distance);
+    double x = target_distance * cos(theta);
+    double y = spline(x);
+
+    time_sampled_path.emplace_back(x, y);
+    // Update our speed for the next waypoint
+    v = std::min(v + accel * kTimeStep, max_speed);
+    cout << "v=" << v
+         << ";tdist=" << target_distance
+         << ";x=" << x
+         <<  ";y=" << y
+         << "|";
+  }
+  cout << endl;
+  DumpPath("time_sampled_path_car", time_sampled_path);
+  // Convert the time_sampled_path back to map coords.
+  return CarPathToMapPath(sdc_state, time_sampled_path);
+}
+
+
+Path GeneratePathByTimeSamples2(const Path &ref_path_map,
                                const CarState &sdc_state,
                                double accel, double max_speed) {
   Path reference_path_car = MapPathToCarPath(sdc_state, ref_path_map);
