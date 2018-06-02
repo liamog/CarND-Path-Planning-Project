@@ -7,6 +7,7 @@
 //
 
 #include <limits.h>
+#include <iostream>
 
 #include "map_state.h"
 #include "path.h"
@@ -29,12 +30,48 @@ TEST(TimeSampledPath, GenerateSDCPathByTimeSamples) {
 
   CarState sdc_state(909.48, 1128.67, 124.8336, 6.164, 0.0, 0.0);
   Path prev_path_map;
+  Path ref_path = GenerateReferencePath(prev_path_map, sdc_state,
+                                        sdc_state.Lane(), map_state);
+
+  Path drivable_path =
+      GenerateSDCPathByTimeSamples(ref_path, prev_path_map, sdc_state, 5.0,
+                                   mph_to_mps(49.5), 1.0 / 50.0, 1.0);
+  const double dist = distance(drivable_path.front(), drivable_path.back());
+  GTEST_ASSERT_GE(dist, 0.0);
+}
+
+TEST(TimeSampledPath, GenerateSDCPathByTimeSamplesNoAccel) {
+  MapState map_state;
+  map_state.LoadMapState("../data/highway_map.csv");
+
+  CarState sdc_state(909.48, 1128.67, 124.8336, 6.164, 0.0, 0.0);
+  Path prev_path_map;
+  Path ref_path = GenerateReferencePath(prev_path_map, sdc_state,
+                                        sdc_state.Lane(), map_state);
+
+  Path drivable_path =
+      GenerateSDCPathByTimeSamples(ref_path, prev_path_map, sdc_state, 0.0,
+                                   mph_to_mps(49.5), 1.0 / 50.0, 1.0);
+  std::cout << "front=" << drivable_path.front()
+            << " back=" << drivable_path.back();
+  const double dist = distance(drivable_path.front(), drivable_path.back());
+  EXPECT_LT(dist, 0.001);
+}
+
+TEST(TimeSampledPath, GenerateSDCPathByTimeSamplesBraking) {
+  MapState map_state;
+  map_state.LoadMapState("../data/highway_map.csv");
+
+  CarState sdc_state(909.48, 1128.67, 124.8336, 6.164, 0.0, 0.0);
+  Path prev_path_map;
   Path drivable_path = GenerateReferencePath(prev_path_map, sdc_state,
                                              sdc_state.Lane(), map_state);
 
   Path ref_path =
-      GenerateSDCPathByTimeSamples(drivable_path, prev_path_map, sdc_state, 5.0,
-                                   mph_to_mps(49.5), 1.0 / 50.0, 1.0);
+      GenerateSDCPathByTimeSamples(drivable_path, prev_path_map, sdc_state,
+                                   -2.0, mph_to_mps(49.5), 1.0 / 50.0, 1.0);
+  const double dist = distance(drivable_path.front(), drivable_path.back());
+  EXPECT_LT(dist, 0.001);
 }
 
 TEST(GeneratePaths, GenerateMultipleReferencePath) {

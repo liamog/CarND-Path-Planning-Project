@@ -128,7 +128,7 @@ int main() {
 
           // Using lambda to compare elements.
           auto cmp = [](Plan left, Plan right) {
-            return get<1>(left) < get<1>(right);
+            return get<1>(left) > get<1>(right);
           };
 
           std::priority_queue<Plan, std::deque<Plan>, decltype(cmp)> plans(cmp);

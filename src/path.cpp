@@ -82,8 +82,9 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
     path.emplace_back(sdc_state.point());
     double kSpacing = 30.0;
     for (int ii = 1; ii <= 3; ii++) {
-      Point point = getXY(sdc_state.s() + (kSpacing * ii),
-                          lane_to_frenet_d(target_lane), map_state);
+      double s = sdc_state.s() + (kSpacing * ii);
+      double d = lane_to_frenet_d(target_lane);
+      Point point = getXY(s, d, map_state);
       path.push_back(point);
     }
   } else {
@@ -132,10 +133,10 @@ Path GenerateSDCPathByTimeSamples(const Path &ref_path_map,
                                   double time_horizon) {
   Path prev_path_car = MapPathToCarPath(sdc_state, prev_path_map);
   //  DumpPath("prev_path_car", prev_path_car);
-  Path reference_path_car = MapPathToCarPath(sdc_state, ref_path_map);
+  Path ref_path_car = MapPathToCarPath(sdc_state, ref_path_map);
+  DumpPath("ref_path_car", ref_path_car);
   tk::spline spline;
-  pair<vector<double>, vector<double>> ref =
-      VectorsFromPath(reference_path_car);
+  pair<vector<double>, vector<double>> ref = VectorsFromPath(ref_path_car);
   spline.set_points(ref.first, ref.second);
 
   const int kTimeSamples = time_horizon / time_step;
@@ -158,14 +159,16 @@ Path GenerateSDCPathByTimeSamples(const Path &ref_path_map,
 
     double target_distance =
         (v * time_step) + (0.5 * accel * time_step * time_step);
-    // First sample the spline with x= our target distance.
-    // This gives us too large a distance but we can use this to approximate the
-    // angle at this point and then use some trig to get the
-    // actual x and sample the spline again.
-    double approx_y = spline(x + target_distance);
-    double theta = atan((approx_y - y) / (target_distance - x));
-    double incremental_x = (target_distance * cos(theta));
-    x = x + incremental_x;
+    if (target_distance > 0.00001) {
+      // First sample the spline with x= our target distance.
+      // This gives us too large a distance but we can use this to approximate
+      // the angle at this point and then use some trig to get the actual x and
+      // sample the spline again.
+      double approx_y = spline(x + target_distance);
+      double theta = atan2((approx_y - y), (target_distance - x));
+      double incremental_x = (target_distance * cos(theta));
+      x = x + incremental_x;
+    }
     y = spline(x);
 
     time_sampled_path.emplace_back(x, y);
@@ -215,7 +218,8 @@ double PathCost(const Path &time_path, const std::vector<Path> &others) {
   const double distance_travelled =
       distance(time_path.front(), time_path.back());
   // Calculate total distance travelled.
-  const double distance_travelled_cost = (1.0 / distance_travelled) * kDistanceTravelledCostWeight;
+  const double distance_travelled_cost =
+      (1.0 / distance_travelled) * kDistanceTravelledCostWeight;
 
   return min_dist_to_car_cost + distance_travelled_cost;
 }
