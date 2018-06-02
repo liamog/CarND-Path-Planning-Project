@@ -27,7 +27,7 @@ double distance(double x1, double y1, double x2, double y2);
 Point getXY(double s, double d, const MapState &map_state);
 
 std::vector<double> getFrenet(double x, double y, double theta,
-                         const std::vector<double> &maps_x,
-                         const std::vector<double> &maps_y);
+                              const std::vector<double> &maps_x,
+                              const std::vector<double> &maps_y);
 
-#endif //PATH_PLANNING_UTILS_H
+#endif  // PATH_PLANNING_UTILS_H

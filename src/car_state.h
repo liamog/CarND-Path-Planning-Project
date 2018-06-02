@@ -12,42 +12,31 @@
 #include <string>
 
 class CarState {
-public:
+ public:
   // Constructor for SDC
-  CarState(double x, double y, double s, double d, double yaw_deg, double v);
+  CarState(double x, double y, double s, double d, double v, double yaw_deg);
 
   // Constructor for other road users.
-  CarState(const std::string &id,
-           double x,
-           double y,
-           double vx,
-           double vy,
-           double s,
-           double d);
+  CarState(double x, double y, double s, double d, double v);
 
   double s() const { return s_; }
-
   double d() const { return d_; }
-
-  double yaw_rad() const { return yaw_rad_; }
-
+  double yaw_rad() const { return yaw_rad_;}
   double v() const { return v_; }
+  const Point &point() const { return point_; }
+  int Lane() const { return frenet_d_to_lane(d_); }
 
-  const Point &point() const { return point_;}
+  std::string ToString() const;
+  std::string ToCsvString() const;
+  static std::string CsvStringHeader();
 
-  int Lane() const {return frenet_d_to_lane(d_);}
-
-    std::string ToString() const;
-
-private:
-  std::string id_;
+ private:
   double s_ = 0.0;
   double d_ = 0.0;
-  double yaw_rad_ = 0.0;
   double v_ = 0.0;
+  double yaw_rad_ = 0.0;
   int lane_ = 1;
   Point point_;
 };
 
-
-#endif //PATH_PLANNING_CARSTATE_H
+#endif  // PATH_PLANNING_CARSTATE_H

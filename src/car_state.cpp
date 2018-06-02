@@ -7,31 +7,49 @@
 
 #include <sstream>
 
-CarState::CarState(double x, double y, double s, double d, double yaw_deg, double v) :
-    id_("SDC"), s_(s), d_(d), yaw_rad_(deg_to_rad(yaw_deg)), v_(v) , point_(x,y) {
+CarState::CarState(double x, double y, double s, double d, double v,
+                   double yaw_deg)
+    : s_(s), d_(d), yaw_rad_(deg_to_rad(yaw_deg)), v_(v), point_(x, y) {
   lane_ = frenet_d_to_lane(d);
 }
 
 // Constructor for other road users.
-CarState::CarState(const std::string &id,
-         double x,
-         double y,
-         double vx,
-         double vy,
-         double s,
-         double d) :
-    id_(id), s_(s), d_(d) , point_(x,y), v_(sqrt(vx*vx + vy*vy)) {
+CarState::CarState(double x, double y, double s, double d, double v)
+    : s_(s), d_(d), point_(x, y), v_(v) {
   lane_ = frenet_d_to_lane(d);
 }
 
 std::string CarState::ToString() const {
   std::stringstream retval;
-  retval << "id=" << id_
-      << "x=" << point_.x
-      << ";y=" << point_.y
-      << ";v=" << v_
-      << ";yaw=" << yaw_rad_
-      << ";yaw_deg=" << rad_to_deg(yaw_rad_)
-      << ";l=" << Lane();
+  retval << "x=" << point_.x << ";y=" << point_.y << ";v=" << v_
+         << ";yaw=" << yaw_rad_ << ";yaw_deg=" << rad_to_deg(yaw_rad_)
+         << ";l=" << Lane();
+  return retval.str();
+}
+
+std::string CarState::ToCsvString() const {
+  std::stringstream retval;
+  retval << s_ << ","
+         << d_ << ","
+         << point_.x << ","
+         << point_.y << ","
+         << v_ << ","
+         << yaw_rad_ << ","
+         << rad_to_deg(yaw_rad_) << ","
+         << Lane();
+  return retval.str();
+}
+
+// static
+std::string CarState::CsvStringHeader() {
+  std::stringstream retval;
+  retval << "s" << ","
+         << "d" << ","
+         << "x" << ","
+         << "y" << ","
+         << "v" << ","
+         << "yaw_rad" << ","
+         << "yaw_deg" << ","
+         << "lane";
   return retval.str();
 }

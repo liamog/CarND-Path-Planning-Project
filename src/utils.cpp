@@ -22,9 +22,7 @@ double mph_to_mps(double mph) { return mph * 0.44704; }
 // Lane to lateral distance (frenet)
 double lane_to_frenet_d(int lane) { return lane * 4.0 + 2.0; }
 
-int frenet_d_to_lane(double frenet) {
-  return frenet / 4.0;
-}
+int frenet_d_to_lane(double frenet) { return frenet / 4.0; }
 
 int ClosestWaypoint(double x, double y, const MapState &map_state) {
   double closestLen = 100000;  // large number
@@ -102,7 +100,8 @@ double distance(double x1, double y1, double x2, double y2) {
 }
 
 // Transform from Cartesian x,y coordinates to Frenet s,d coordinates
-vector<double> getFrenet(double x, double y, double theta, const MapState map_state) {
+vector<double> getFrenet(double x, double y, double theta,
+                         const MapState map_state) {
   int next_wp = NextWaypoint(x, y, theta, map_state);
 
   int prev_wp;
@@ -111,8 +110,10 @@ vector<double> getFrenet(double x, double y, double theta, const MapState map_st
     prev_wp = map_state.map_waypoints_x().size() - 1;
   }
 
-  double n_x = map_state.map_waypoints_x()[next_wp] - map_state.map_waypoints_x()[prev_wp];
-  double n_y = map_state.map_waypoints_y()[next_wp] - map_state.map_waypoints_y()[prev_wp];
+  double n_x = map_state.map_waypoints_x()[next_wp] -
+               map_state.map_waypoints_x()[prev_wp];
+  double n_y = map_state.map_waypoints_y()[next_wp] -
+               map_state.map_waypoints_y()[prev_wp];
   double x_x = x - map_state.map_waypoints_x()[prev_wp];
   double x_y = y - map_state.map_waypoints_y()[prev_wp];
 
@@ -137,7 +138,9 @@ vector<double> getFrenet(double x, double y, double theta, const MapState map_st
   // calculate s value
   double frenet_s = 0;
   for (int i = 0; i < prev_wp; i++) {
-    frenet_s += distance(map_state.map_waypoints_x()[i], map_state.map_waypoints_y()[i], map_state.map_waypoints_x()[i + 1], map_state.map_waypoints_y()[i + 1]);
+    frenet_s += distance(
+        map_state.map_waypoints_x()[i], map_state.map_waypoints_y()[i],
+        map_state.map_waypoints_x()[i + 1], map_state.map_waypoints_y()[i + 1]);
   }
 
   frenet_s += distance(0, 0, proj_x, proj_y);
@@ -149,14 +152,17 @@ vector<double> getFrenet(double x, double y, double theta, const MapState map_st
 Point getXY(double s, double d, const MapState &map_state) {
   int prev_wp = -1;
 
-  while (s > map_state.map_waypoints_s()[prev_wp + 1] && (prev_wp < (int) (map_state.map_waypoints_s().size() - 1))) {
+  while (s > map_state.map_waypoints_s()[prev_wp + 1] &&
+         (prev_wp < (int)(map_state.map_waypoints_s().size() - 1))) {
     prev_wp++;
   }
 
   int wp2 = (prev_wp + 1) % map_state.map_waypoints_x().size();
 
-  double heading =
-      atan2((map_state.map_waypoints_y()[wp2] - map_state.map_waypoints_y()[prev_wp]), (map_state.map_waypoints_x()[wp2] - map_state.map_waypoints_x()[prev_wp]));
+  double heading = atan2(
+      (map_state.map_waypoints_y()[wp2] - map_state.map_waypoints_y()[prev_wp]),
+      (map_state.map_waypoints_x()[wp2] -
+       map_state.map_waypoints_x()[prev_wp]));
   // the x,y,s along the segment
   double seg_s = (s - map_state.map_waypoints_s()[prev_wp]);
 

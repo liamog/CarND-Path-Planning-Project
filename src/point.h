@@ -9,15 +9,15 @@
 
 struct Point {
   Point();
-  Point(const Point&) = default;
-  Point(std::vector<double> xy );
+  Point(const Point &) = default;
+  Point(std::vector<double> xy);
   Point(double x, double y);
 
-  Point &operator=(const Point&) = default;
+  Point &operator=(const Point &) = default;
   std::vector<double> ToVector();
 
   double x = 0.0;
   double y = 0.0;
 };
 
-#endif //PATH_PLANNING_POINT_H
+#endif  // PATH_PLANNING_POINT_H

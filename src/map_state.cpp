@@ -10,7 +10,7 @@
 
 using namespace std;
 
-void MapState::LoadMapState(const char * path) {
+void MapState::LoadMapState(const char* path) {
   // Waypoint map to read from
   // The max s value before wrapping around the track back to 0
   double max_s = 6945.554;

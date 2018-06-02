@@ -36,10 +36,9 @@ string hasData(string s) {
   return "";
 }
 
-
 int main() {
   uWS::Hub h;
-  double reference_velocity_mps = mph_to_mps(49.5);  // 49.5 mph in m/s
+  double reference_velocity_mps = mph_to_mps(45);  // 49.5 mph in m/s
 
   int lane = 1;
 
@@ -47,11 +46,16 @@ int main() {
   MapState map_state;
   map_state.LoadMapState("../data/highway_map.csv");
 
-  h.onMessage([lane, &map_state](uWS::WebSocket<uWS::SERVER> ws, char *data,
-                                 size_t length, uWS::OpCode opCode) {
-    cout << endl;
-    cout << "-------------------------------------------------------------";
-    cout << endl;
+  ofstream car_state_stream("car_state.csv");
+  car_state_stream << CarState::CsvStringHeader() << endl;
+
+//  ofstream refpath_stream("ref_path.csv");
+//
+
+
+  h.onMessage([lane, &map_state, &car_state_stream](
+                  uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+                  uWS::OpCode opCode) {
 
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -76,13 +80,16 @@ int main() {
           double car_d = j[1]["d"];
           double car_yaw = j[1]["yaw"];
           double car_speed = j[1]["speed"];
-          CarState sdc_state(car_x, car_y, car_s, car_d, car_yaw, car_speed);
-          cout << sdc_state.ToString() << endl;
+          CarState sdc_state(car_x, car_y, car_s, car_d, car_speed, car_yaw);
+
+          car_state_stream << sdc_state.ToCsvString() << endl;
+          car_state_stream.flush();
+
           // Previous path data given to the Planner
           auto previous_path_x = j[1]["previous_path_x"];
           auto previous_path_y = j[1]["previous_path_y"];
-          Path prev_path_map = PathFromVectors(previous_path_x,
-                                               previous_path_y);
+          Path prev_path_map =
+              PathFromVectors(previous_path_x, previous_path_y);
 
           // Previous path's end s and d values
           double end_path_s = j[1]["end_path_s"];
@@ -91,28 +98,31 @@ int main() {
           // Sensor Fusion Data, a list of all other cars on the same side of
           // the road.
           std::vector<CarState> others;
-//          auto sensor_fusion = j[1]["sensor_fusion"];
-//          for (auto other : sensor_fusion) {
-//            others.emplace_back(other[0], other[1], other[2], other[3],
-//                                other[4], other[5], other[6]);
-//          }
+          auto sensor_fusion = j[1]["sensor_fusion"];
+          for (auto other : sensor_fusion) {
+            //[ id, x, y, vx, vy, s, d]
+            const auto id = other[0];
+            const double x = other[1];
+            const double y = other[2];
+            const double vx = other[3];
+            const double vy = other[4];
+            const double s = other[5];
+            const double d = other[6];
+
+            const double v = sqrt((vx * vx) + (vy * vy));
+            others.emplace_back(x, y, s, d, v);
+          }
 
           json msgJson;
 
           // Generate a reference path for the current lane in map co-ordinates.
-          Path ref_path_map = GenerateReferencePath(prev_path_map,
-                                                    sdc_state,
-                                                    1,
-                                                    map_state);
-          Path drivable_path = GeneratePathByTimeSamples(ref_path_map,
-                                                         prev_path_map,
-                                                         sdc_state,
-                                                         8.0,
-                                                         mph_to_mps(49.5));
+          Path ref_path_map =
+              GenerateReferencePath(prev_path_map, sdc_state, 1, map_state);
+          Path drivable_path = GeneratePathByTimeSamples(
+              ref_path_map, prev_path_map, sdc_state, 8.0, mph_to_mps(45));
 
-
-          std::pair<vector<double>, vector<double>> next = VectorsFromPath(
-              drivable_path);
+          std::pair<vector<double>, vector<double>> next =
+              VectorsFromPath(drivable_path);
           // TODO: define a path made up of (x,y) points that the car will visit
           // sequentially every .02 seconds
           msgJson["next_x"] = next.first;
