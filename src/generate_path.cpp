@@ -6,8 +6,8 @@
 #include <cmath>
 #include <iostream>
 #include <vector>
-#include "spline.h"
 #include "path.h"
+#include "spline.h"
 
 using namespace std;
 
@@ -58,7 +58,7 @@ Path PathFromVectors(const std::vector<double> &x,
 }
 
 vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
-                                    const CarState &car_state,
+                                    const CarState &sdc_state,
                                     const int target_lane,
                                     const MapState &map_state) {
   // Create a reference set of waypoints that includes the current
@@ -67,27 +67,43 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
 
   if (prev_map_path.size() < 2) {
     // Create an initial reference path.
-    path.emplace_back(car_state.point());
-    double spacing = 30.0;
+    path.emplace_back(sdc_state.point());
+    double kSpacing = 30.0;
     for (int ii = 1; ii <= 3; ii++) {
-      Point point = getXY(car_state.s() + (spacing * ii),
+      Point point = getXY(sdc_state.s() + (kSpacing * ii),
                           lane_to_frenet_d(target_lane), map_state);
       path.push_back(point);
     }
   } else {
     // Add samples from previous path to the new reference path.
+    //    path.emplace_back(car_state.point());
+
     int steps = prev_map_path.size() / 3;
-    for (int ii = 0; ii < prev_map_path.size() - 1; ii += steps) {
+    for (int ii = steps; ii < prev_map_path.size() - 1; ii += steps) {
       path.emplace_back(prev_map_path[ii]);
     }
     // Make sure the last point in the previous path is on the new reference
     // path to ensure a smooth transition when growing the trajectory.
-    path.emplace_back(prev_map_path.back());
+    const Point &last_point = prev_map_path.back();
+    path.emplace_back(last_point);
+    vector<double> last_frenet =
+        getFrenet(last_point.x, last_point.y, sdc_state.yaw_rad(), map_state);
 
+    // Add a point at the end of the previous trajectory + 10 m.
     Point point =
-        getXY(car_state.s() + 90.0, lane_to_frenet_d(target_lane), map_state);
+        getXY(last_frenet[0] + 10.0, lane_to_frenet_d(target_lane), map_state);
     path.push_back(point);
   }
+  Path car_ref_path = MapPathToCarPath(sdc_state, path);
+  double x = -1.0;
+  cout << endl << "X:";
+  for (const Point &p : car_ref_path) {
+    cout << p.x << ",";
+    if (p.x <= x) {
+      cout << "WARNING " << p.x << " LT " << x;
+    }
+  }
+  cout << endl;
 
   //  path.emplace_back(car_state.point());
 
@@ -97,22 +113,21 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
   return path;
 }
 
-Path GeneratePathByTimeSamples(const Path &ref_path_map,
-                               const Path &prev_path_map,
-                               const CarState &sdc_state, double accel,
-                               double max_speed) {
+Path GenerateSDCPathByTimeSamples(const Path &ref_path_map,
+                                  const Path &prev_path_map,
+                                  const CarState &sdc_state, double accel,
+                                  double max_speed, double time_step,
+                                  double time_horizon) {
   Path prev_path_car = MapPathToCarPath(sdc_state, prev_path_map);
-  DumpPath("prev_path_car", prev_path_car);
+  //  DumpPath("prev_path_car", prev_path_car);
   Path reference_path_car = MapPathToCarPath(sdc_state, ref_path_map);
   tk::spline spline;
   pair<vector<double>, vector<double>> ref =
       VectorsFromPath(reference_path_car);
   spline.set_points(ref.first, ref.second);
 
-  constexpr double kTimeStep = 1.0 / 50;
-  constexpr double kTimeHorizon = 2.0;
-  const int kTimeSamples = kTimeHorizon * 50;
-  const double kMaxDistanceHorizon = kTimeHorizon * max_speed;
+  const int kTimeSamples = time_horizon / time_step;
+  const double kMaxDistanceHorizon = time_horizon * max_speed;
   int kNumImmutable = 30;
 
   double v = std::min(sdc_state.v(), max_speed);
@@ -123,14 +138,14 @@ Path GeneratePathByTimeSamples(const Path &ref_path_map,
   for (int ii = 0, jj = 0; ii < kTimeSamples; ++ii) {
     if (ii < prev_path_car.size()) {
       time_sampled_path.emplace_back(prev_path_car[ii]);
-      v = distance(x, y, prev_path_car[ii].x, prev_path_car[ii].y) / kTimeStep;
+      v = distance(x, y, prev_path_car[ii].x, prev_path_car[ii].y) / time_step;
       x = prev_path_car[ii].x;
       y = prev_path_car[ii].y;
       continue;
     }
 
     double target_distance =
-        (v * kTimeStep) + (0.5 * accel * kTimeStep * kTimeStep);
+        (v * time_step) + (0.5 * accel * time_step * time_step);
     // First sample the spline with x= our target distance.
     // This gives us too large a distance but we can use this to approximate the
     // angle at this point and then use some trig to get the
@@ -143,87 +158,24 @@ Path GeneratePathByTimeSamples(const Path &ref_path_map,
 
     time_sampled_path.emplace_back(x, y);
     // Update our speed for the next waypoint
-    v = std::min(v + accel * kTimeStep, max_speed);
+    v = std::min(v + accel * time_step, max_speed);
   }
-  cout << endl;
-  DumpPath("time_sampled_path_car", time_sampled_path);
+  //  DumpPath("time_sampled_path_car", time_sampled_path);
   // Convert the time_sampled_path back to map coords.
   return CarPathToMapPath(sdc_state, time_sampled_path);
 }
 
-Path GeneratePathByTimeSamples2(const Path &ref_path_map,
-                                const CarState &sdc_state, double accel,
-                                double max_speed) {
-  Path reference_path_car = MapPathToCarPath(sdc_state, ref_path_map);
-  tk::spline spline;
-  pair<vector<double>, vector<double>> ref =
-      VectorsFromPath(reference_path_car);
-  spline.set_points(ref.first, ref.second);
-  constexpr double kTimeStep = 1.0 / 50;
-  constexpr double kTimeHorizon = 1.0;
-  const int kTimeSamples = kTimeHorizon * 50;
-  const double kMaxDistanceHorizon = kTimeHorizon * max_speed;
-  constexpr double kDistSample = 0.10;
-
-  // Next we need to sample the spline at 0.2second intervals, applying the,
-  // acceleration provided up to the max reference speed.
-  double point_speed = sdc_state.v();
-  double v = sdc_state.v();
-
-  // if we assume a straight line with no curvature, then the max distance we
-  // care abu
-  Path spatial_path;
-  vector<double> dist_step;
-  double x = kDistSample, prev_x = 0.0;
-  double y = 0.0, prev_y = 0.0;
-  spatial_path.emplace_back(0.0, 0.0);
-  while (x < kMaxDistanceHorizon) {
-    y = spline(x);
-    spatial_path.emplace_back(x, y);
-    double dist_travelled = sqrt(pow(x - prev_x, 2) + pow(y - prev_y, 2));
-    dist_step.push_back(dist_travelled);
-    prev_x = x;
-    prev_y = y;
-    x += kDistSample;
+Path GenerateOtherPathByTimeSamples(const CarState &other_state,
+                                    const double time_step,
+                                    const double time_horizon,
+                                    const MapState &map_state) {
+  // Build a simple predicted path assuming no acceleration for the other agent
+  // Start with just frenet coorindates and increment the s according to v.
+  Path path;
+  for (double t = 0; t < time_horizon; t += time_step) {
+    Point point = getXY(other_state.s() + (other_state.v() * t),
+                        other_state.d(), map_state);
+    path.push_back(point);
   }
-  cout << endl;
-
-  // Build a path of way points sampled from the spline waypoints (spatial).
-  // so they cover the distance we want to travel in the time step.
-  Path time_sampled_path;
-  time_sampled_path.push_back(spatial_path[0]);
-  double target_distance = 0;
-  for (int ii = 0, jj = 0; ii < kTimeSamples && jj < spatial_path.size();
-       ++ii) {
-    target_distance += (v * kTimeStep) + (0.5 * accel * kTimeStep * kTimeStep);
-
-    double distance_travelled = 0.0;
-    // Now walk the spatial waypoints until we have consumed the required
-    // distance. We will use the nearest waypoint from the spatial set, which
-    // may be slightly past the target distance.
-    while (distance_travelled < target_distance) {
-      distance_travelled += dist_step[jj];
-      jj++;
-    }
-    // one of jj and jj-1 of the spatial path are closest to the target,
-    // we will pick the closest.
-    const double prev_dist_travelled = distance_travelled - dist_step[jj - 1];
-    const double prev_dist_to_target = target_distance - prev_dist_travelled;
-    const double dist_to_target = distance_travelled - target_distance;
-    if (prev_dist_to_target < dist_to_target) {
-      // We will use the point just before the target distance.
-      jj--;
-      distance_travelled = prev_dist_travelled;
-    }
-    target_distance -= distance_travelled;
-    time_sampled_path.push_back(spatial_path[jj]);
-    // Update our speed for the next waypoint
-    v = std::min(v + accel * kTimeStep, max_speed);
-    cout << "v=" << v << ";tdist=" << target_distance
-         << ";x=" << spatial_path[jj].x << ";y=" << spatial_path[jj].y << "|";
-  }
-  cout << endl;
-  DumpPath("time_sampled_path_car", time_sampled_path);
-  // Convert the time_sampled_path back to map coords.
-  return CarPathToMapPath(sdc_state, time_sampled_path);
+  return path;
 }

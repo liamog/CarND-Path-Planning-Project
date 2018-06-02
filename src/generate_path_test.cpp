@@ -19,7 +19,7 @@ TEST(GeneratePaths, GenerateFirstReferencePath) {
                                              sdc_state.Lane(), map_state);
 }
 
-TEST(TimeSampledPath, GeneratePathByTimeSamples) {
+TEST(TimeSampledPath, GenerateSDCPathByTimeSamples) {
   MapState map_state;
   map_state.LoadMapState("../data/highway_map.csv");
 
@@ -28,8 +28,8 @@ TEST(TimeSampledPath, GeneratePathByTimeSamples) {
   Path drivable_path = GenerateReferencePath(prev_path_map, sdc_state,
                                              sdc_state.Lane(), map_state);
 
-  Path ref_path = GeneratePathByTimeSamples(drivable_path, prev_path_map,
-                                            sdc_state, 5.0, mph_to_mps(49.5));
+  Path ref_path = GenerateSDCPathByTimeSamples(drivable_path, prev_path_map,
+                                               sdc_state, 5.0, mph_to_mps(49.5));
 }
 
 TEST(GeneratePaths, GenerateMultipleReferencePath) {
@@ -40,13 +40,13 @@ TEST(GeneratePaths, GenerateMultipleReferencePath) {
   Path ref_path = GenerateReferencePath(prev_path_map, sdc_state,
                                         sdc_state.Lane(), map_state);
 
-  Path drivable_path = GeneratePathByTimeSamples(
+  Path drivable_path = GenerateSDCPathByTimeSamples(
       ref_path, prev_path_map, sdc_state, 5.0, mph_to_mps(49.5));
 
   Path ref_path2 = GenerateReferencePath(drivable_path, sdc_state,
                                          sdc_state.Lane(), map_state);
 
   drivable_path.erase(drivable_path.begin(), drivable_path.begin() + 3);
-  Path drivable_path2 = GeneratePathByTimeSamples(
+  Path drivable_path2 = GenerateSDCPathByTimeSamples(
       ref_path2, prev_path_map, sdc_state, 5.0, mph_to_mps(49.5));
 }

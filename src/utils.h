@@ -22,12 +22,12 @@ Point map2car(const Point &car_in_map, double psi, const Point &input);
 
 Point car2map(const Point &car_in_map, double psi, const Point &input);
 
+double distance(const Point &p1, const Point &p2);
 double distance(double x1, double y1, double x2, double y2);
 
 Point getXY(double s, double d, const MapState &map_state);
 
 std::vector<double> getFrenet(double x, double y, double theta,
-                              const std::vector<double> &maps_x,
-                              const std::vector<double> &maps_y);
+                              const MapState &map_state);
 
 #endif  // PATH_PLANNING_UTILS_H

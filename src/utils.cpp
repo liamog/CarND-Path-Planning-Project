@@ -95,13 +95,17 @@ Point car2map(const Point &car_in_map, double psi, const Point &input) {
   return point_in_map_coords;
 }
 
+double distance(const Point &p1, const Point &p2) {
+  return distance(p1.x, p1.y, p2.x, p2.y);
+}
+
 double distance(double x1, double y1, double x2, double y2) {
   return sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
 }
 
 // Transform from Cartesian x,y coordinates to Frenet s,d coordinates
 vector<double> getFrenet(double x, double y, double theta,
-                         const MapState map_state) {
+                         const MapState &map_state) {
   int next_wp = NextWaypoint(x, y, theta, map_state);
 
   int prev_wp;

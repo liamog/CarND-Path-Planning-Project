@@ -14,6 +14,8 @@
 #include "car_state.h"
 #include "generate_path.h"
 #include "map_state.h"
+#include "path.h"
+
 #include "spline.h"
 
 using namespace std;
@@ -49,13 +51,14 @@ int main() {
   ofstream car_state_stream("car_state.csv");
   car_state_stream << CarState::CsvStringHeader() << endl;
 
-//  ofstream refpath_stream("ref_path.csv");
-//
-
+  //  ofstream refpath_stream("ref_path.csv");
+  //
 
   h.onMessage([lane, &map_state, &car_state_stream](
                   uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                   uWS::OpCode opCode) {
+    constexpr double kTimeStep = 1.0 / 50;
+    constexpr double kTimeHorizon = 1.0;
 
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -97,7 +100,7 @@ int main() {
 
           // Sensor Fusion Data, a list of all other cars on the same side of
           // the road.
-          std::vector<CarState> others;
+          std::vector<Path> others;
           auto sensor_fusion = j[1]["sensor_fusion"];
           for (auto other : sensor_fusion) {
             //[ id, x, y, vx, vy, s, d]
@@ -110,7 +113,9 @@ int main() {
             const double d = other[6];
 
             const double v = sqrt((vx * vx) + (vy * vy));
-            others.emplace_back(x, y, s, d, v);
+            CarState state(x, y, s, d, v);
+            others.emplace_back(GenerateOtherPathByTimeSamples(
+                state, kTimeStep, kTimeHorizon, map_state));
           }
 
           json msgJson;
@@ -118,8 +123,14 @@ int main() {
           // Generate a reference path for the current lane in map co-ordinates.
           Path ref_path_map =
               GenerateReferencePath(prev_path_map, sdc_state, 1, map_state);
-          Path drivable_path = GeneratePathByTimeSamples(
-              ref_path_map, prev_path_map, sdc_state, 8.0, mph_to_mps(45));
+          Path drivable_path = GenerateSDCPathByTimeSamples(
+              ref_path_map, prev_path_map, sdc_state, 8.0, mph_to_mps(45),
+              kTimeStep, kTimeHorizon);
+
+          double path_cost = PathCost(drivable_path, others);
+          if (path_cost != std::numeric_limits<double>::infinity()) {
+            cout << "Path cost = " << path_cost << endl;
+          }
 
           std::pair<vector<double>, vector<double>> next =
               VectorsFromPath(drivable_path);

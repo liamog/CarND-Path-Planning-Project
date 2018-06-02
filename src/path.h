@@ -9,6 +9,6 @@
 
 typedef std::vector<Point> Path;
 
-
+double PathCost(const Path &time_path, const std::vector<Path> &others);
 
 #endif //PATH_PLANNING_PATH_H
