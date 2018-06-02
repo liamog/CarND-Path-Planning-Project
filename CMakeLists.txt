@@ -13,7 +13,9 @@ endif (APPLE)
 set(CXX_FLAGS "-Wall -g")
 set(CMAKE_CXX_FLAGS, "${CXX_FLAGS}")
 
-set(sources src/main.cpp src/utils.cpp src/utils.h src/generate_path.cpp src/generate_path.h src/car_state.cpp src/car_state.h src/point.h src/point.cpp src/map_state.h src/map_state.cpp)
+set(sources  src/path.h src/path.cpp src/utils.cpp src/utils.h src/car_state.cpp src/car_state.h src/point.h src/point.cpp src/map_state.h src/map_state.cpp)
+set(sources_main src/main.cpp)
+set(testsources src/utils_test.cpp src/path_test.cpp)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin") 
 
@@ -25,12 +27,12 @@ link_directories(/usr/local/lib)
 link_directories(/usr/local/opt/openssl/lib)
 link_directories(/usr/local/Cellar/libuv/1.11.0/lib)
 
-endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin") 
+endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 
-add_executable(path_planning ${sources})
+add_executable(path_planning ${sources_main} ${sources})
 
 target_link_libraries(path_planning z ssl uv uWS)
 
-add_executable(path_planning_tests src/utils.cpp src/utils.h src/utils_test.cpp)
+add_executable(path_planning_tests ${sources} ${testsources})
 target_link_libraries(path_planning_tests gtest gtest_main)

@@ -3,8 +3,10 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <queue>
 #include <thread>
 #include <vector>
+
 #include "utils.h"
 
 #include "Eigen-3.3/Eigen/Core"
@@ -120,20 +122,34 @@ int main() {
 
           json msgJson;
 
-          // Generate a reference path for the current lane in map co-ordinates.
-          Path ref_path_map =
-              GenerateReferencePath(prev_path_map, sdc_state, 1, map_state);
-          Path drivable_path = GenerateSDCPathByTimeSamples(
-              ref_path_map, prev_path_map, sdc_state, 8.0, mph_to_mps(45),
-              kTimeStep, kTimeHorizon);
+          double kMaxAccel = 6.0;
+          double kNoAccel = 0.0;
+          double kMinAccel = -2.0;
+          double kMaxSpeed = mph_to_mps(45);
 
-          double path_cost = PathCost(drivable_path, others);
-          if (path_cost != std::numeric_limits<double>::infinity()) {
-            cout << "Path cost = " << path_cost << endl;
-          }
+          // Using lambda to compare elements.
+          auto cmp = [](Plan left, Plan right) {
+            return get<1>(left) < get<1>(right);
+          };
 
+          std::priority_queue<Plan, std::deque<Plan>, decltype(cmp)> plans(cmp);
+
+          // Accel
+          plans.push(GeneratePathAndCost("Accel:1", prev_path_map, sdc_state,
+                                         others, map_state, 1, kMaxAccel,
+                                         kMaxSpeed, kTimeStep, kTimeHorizon));
+          // Maintain speed
+          plans.push(GeneratePathAndCost("Maintain:1", prev_path_map, sdc_state,
+                                         others, map_state, 1, kNoAccel,
+                                         kMaxSpeed, kTimeStep, kTimeHorizon));
+
+          // Brake
+          plans.push(GeneratePathAndCost("brake:1", prev_path_map, sdc_state,
+                                         others, map_state, 1, kMinAccel,
+                                         kMaxSpeed, kTimeStep, kTimeHorizon));
+          cout << "Selected " << get<0>(plans.top());
           std::pair<vector<double>, vector<double>> next =
-              VectorsFromPath(drivable_path);
+              VectorsFromPath(get<2>(plans.top()));
           // TODO: define a path made up of (x,y) points that the car will visit
           // sequentially every .02 seconds
           msgJson["next_x"] = next.first;
