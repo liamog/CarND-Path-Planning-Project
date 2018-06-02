@@ -14,7 +14,6 @@
 #include "json.hpp"
 
 #include "car_state.h"
-#include "generate_path.h"
 #include "map_state.h"
 #include "path.h"
 
@@ -147,6 +146,7 @@ int main() {
           plans.push(GeneratePathAndCost("brake:1", prev_path_map, sdc_state,
                                          others, map_state, 1, kMinAccel,
                                          kMaxSpeed, kTimeStep, kTimeHorizon));
+
           cout << "Selected " << get<0>(plans.top());
           std::pair<vector<double>, vector<double>> next =
               VectorsFromPath(get<2>(plans.top()));
