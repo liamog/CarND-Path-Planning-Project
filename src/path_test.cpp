@@ -20,8 +20,9 @@ TEST(GeneratePaths, GenerateFirstReferencePath) {
   map_state.LoadMapState("../data/highway_map.csv");
   CarState sdc_state(909.48, 1128.67, 124.8336, 6.164, 0.0, 0.0);
   Path prev_path_map;
-  Path drivable_path = GenerateReferencePath(prev_path_map, sdc_state,
-                                             sdc_state.Lane(), map_state);
+  Path ref_path = GenerateReferencePath(
+      prev_path_map, sdc_state, std::make_tuple(sdc_state.s(), sdc_state.d()),
+      sdc_state.Lane(), map_state);
 }
 
 TEST(TimeSampledPath, GenerateSDCPathByTimeSamples) {
@@ -30,8 +31,9 @@ TEST(TimeSampledPath, GenerateSDCPathByTimeSamples) {
 
   CarState sdc_state(909.48, 1128.67, 124.8336, 6.164, 0.0, 0.0);
   Path prev_path_map;
-  Path ref_path = GenerateReferencePath(prev_path_map, sdc_state,
-                                        sdc_state.Lane(), map_state);
+  Path ref_path = GenerateReferencePath(
+      prev_path_map, sdc_state, std::make_tuple(sdc_state.s(), sdc_state.d()),
+      sdc_state.Lane(), map_state);
 
   Path drivable_path =
       GenerateSDCPathByTimeSamples(ref_path, prev_path_map, sdc_state, 5.0,
@@ -46,8 +48,9 @@ TEST(TimeSampledPath, GenerateSDCPathByTimeSamplesNoAccel) {
 
   CarState sdc_state(909.48, 1128.67, 124.8336, 6.164, 0.0, 0.0);
   Path prev_path_map;
-  Path ref_path = GenerateReferencePath(prev_path_map, sdc_state,
-                                        sdc_state.Lane(), map_state);
+  Path ref_path = GenerateReferencePath(
+      prev_path_map, sdc_state, std::make_tuple(sdc_state.s(), sdc_state.d()),
+      sdc_state.Lane(), map_state);
 
   Path drivable_path =
       GenerateSDCPathByTimeSamples(ref_path, prev_path_map, sdc_state, 0.0,
@@ -64,11 +67,12 @@ TEST(TimeSampledPath, GenerateSDCPathByTimeSamplesBraking) {
 
   CarState sdc_state(909.48, 1128.67, 124.8336, 6.164, 0.0, 0.0);
   Path prev_path_map;
-  Path drivable_path = GenerateReferencePath(prev_path_map, sdc_state,
-                                             sdc_state.Lane(), map_state);
+  Path ref_path = GenerateReferencePath(
+      prev_path_map, sdc_state, std::make_tuple(sdc_state.s(), sdc_state.d()),
+      sdc_state.Lane(), map_state);
 
-  Path ref_path =
-      GenerateSDCPathByTimeSamples(drivable_path, prev_path_map, sdc_state,
+  Path drivable_path =
+      GenerateSDCPathByTimeSamples(ref_path, prev_path_map, sdc_state,
                                    -2.0, mph_to_mps(49.5), 1.0 / 50.0, 1.0);
   const double dist = distance(drivable_path.front(), drivable_path.back());
   EXPECT_LT(dist, 0.001);
@@ -79,15 +83,17 @@ TEST(GeneratePaths, GenerateMultipleReferencePath) {
   map_state.LoadMapState("../data/highway_map.csv");
   CarState sdc_state(909.48, 1128.67, 124.8336, 6.164, 0.0, 0.0);
   Path prev_path_map;
-  Path ref_path = GenerateReferencePath(prev_path_map, sdc_state,
-                                        sdc_state.Lane(), map_state);
+  Path ref_path = GenerateReferencePath(
+      prev_path_map, sdc_state, std::make_tuple(sdc_state.s(), sdc_state.d()),
+      sdc_state.Lane(), map_state);
 
   Path drivable_path =
       GenerateSDCPathByTimeSamples(ref_path, prev_path_map, sdc_state, 5.0,
                                    mph_to_mps(49.5), 1.0 / 50.0, 1.0);
 
-  Path ref_path2 = GenerateReferencePath(drivable_path, sdc_state,
-                                         sdc_state.Lane(), map_state);
+  Path ref_path2 = GenerateReferencePath(
+      drivable_path, sdc_state, std::make_tuple(sdc_state.s(), sdc_state.d()),
+      sdc_state.Lane(), map_state);
 
   drivable_path.erase(drivable_path.begin(), drivable_path.begin() + 3);
   Path drivable_path2 =

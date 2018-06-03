@@ -71,6 +71,7 @@ Path PathFromVectors(const std::vector<double> &x,
 
 vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
                                     const CarState &sdc_state,
+                                    std::tuple<double, double> end_path_s_d,
                                     const int target_lane,
                                     const MapState &map_state) {
   // Create a reference set of waypoints that includes the current
@@ -89,24 +90,40 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
     }
   } else {
     // Add samples from previous path to the new reference path.
-    //    path.emplace_back(car_state.point());
+    // However the last path might be very short if the speed is low.
+    // So make sure that we get to a minimum length
+    double path_length = 0.0;
+    constexpr double kMinRefPathLength = 100.0;
 
-    int steps = prev_map_path.size() / 3;
-    for (int ii = steps; ii < prev_map_path.size() - 1; ii += steps) {
-      path.emplace_back(prev_map_path[ii]);
+//    path.emplace_back(prev_map_path[0]);
+    double s, d;
+    std::tie(s, d) = end_path_s_d;
+    double path_s_length = s - sdc_state.s();
+
+    // Once we reach a certain length path from the previous trajectory, we
+    // add in a few of these points to the spline.
+    if (path_s_length > 20.0) {
+      int steps = prev_map_path.size() / 3;
+      for (int ii = steps; ii < prev_map_path.size() - 1; ii += steps) {
+        path.emplace_back(prev_map_path[ii]);
+      }
     }
     // Make sure the last point in the previous path is on the new reference
     // path to ensure a smooth transition when growing the trajectory.
     const Point &last_point = prev_map_path.back();
     path.emplace_back(last_point);
-    vector<double> last_frenet =
-        getFrenet(last_point.x, last_point.y, sdc_state.yaw_rad(), map_state);
+    double kSpacing = 30.0;
 
-    // Add a point at the end of the previous trajectory + 10 m.
-    Point point =
-        getXY(last_frenet[0] + 10.0, lane_to_frenet_d(target_lane), map_state);
-    path.push_back(point);
+    for (path_s_length += kSpacing; path_s_length < kMinRefPathLength;
+         path_s_length += kSpacing) {
+      double new_s = sdc_state.s() + path_s_length;
+      double new_d = lane_to_frenet_d(target_lane);
+      Point point = getXY(new_s, new_d, map_state);
+
+      path.push_back(point);
+    }
   }
+
   Path car_ref_path = MapPathToCarPath(sdc_state, path);
   double x = -1.0;
   cout << endl << "X:";
@@ -227,12 +244,13 @@ double PathCost(const Path &time_path, const std::vector<Path> &others) {
 Plan GeneratePathAndCost(const std::string &plan_name,
                          const Path &prev_path_map, const CarState &sdc_state,
                          const std::vector<Path> &others,
-                         const MapState &map_state, int target_lane,
-                         double accel, double max_speed, double time_step,
-                         double time_horizon) {
+                         const MapState &map_state,
+                         std::tuple<double, double> end_path_s_d,
+                         int target_lane, double accel, double max_speed,
+                         double time_step, double time_horizon) {
   // Generate a reference path for the current lane in map co-ordinates.
-  Path ref_path_map =
-      GenerateReferencePath(prev_path_map, sdc_state, target_lane, map_state);
+  Path ref_path_map = GenerateReferencePath(
+      prev_path_map, sdc_state, end_path_s_d, target_lane, map_state);
   Path drivable_path =
       GenerateSDCPathByTimeSamples(ref_path_map, prev_path_map, sdc_state,
                                    accel, max_speed, time_step, time_horizon);

@@ -98,7 +98,7 @@ int main() {
           // Previous path's end s and d values
           double end_path_s = j[1]["end_path_s"];
           double end_path_d = j[1]["end_path_d"];
-
+          std::tuple<double, double> end_path_s_d(end_path_s, end_path_d);
           // Sensor Fusion Data, a list of all other cars on the same side of
           // the road.
           std::vector<Path> others;
@@ -134,18 +134,18 @@ int main() {
           std::priority_queue<Plan, std::deque<Plan>, decltype(cmp)> plans(cmp);
 
           // Accel
-          plans.push(GeneratePathAndCost("Accel:1", prev_path_map, sdc_state,
-                                         others, map_state, 1, kMaxAccel,
-                                         kMaxSpeed, kTimeStep, kTimeHorizon));
+          plans.push(GeneratePathAndCost(
+              "Accel:1", prev_path_map, sdc_state, others, map_state,
+              end_path_s_d, 1, kMaxAccel, kMaxSpeed, kTimeStep, kTimeHorizon));
           // Maintain speed
-          plans.push(GeneratePathAndCost("Maintain:1", prev_path_map, sdc_state,
-                                         others, map_state, 1, kNoAccel,
-                                         kMaxSpeed, kTimeStep, kTimeHorizon));
+          plans.push(GeneratePathAndCost(
+              "Maintain:1", prev_path_map, sdc_state, others, map_state,
+              end_path_s_d, 1, kNoAccel, kMaxSpeed, kTimeStep, kTimeHorizon));
 
           // Brake
-          plans.push(GeneratePathAndCost("brake:1", prev_path_map, sdc_state,
-                                         others, map_state, 1, kMinAccel,
-                                         kMaxSpeed, kTimeStep, kTimeHorizon));
+          plans.push(GeneratePathAndCost(
+              "brake:1", prev_path_map, sdc_state, others, map_state,
+              end_path_s_d, 1, kMinAccel, kMaxSpeed, kTimeStep, kTimeHorizon));
 
           cout << "Selected " << get<0>(plans.top());
           std::pair<vector<double>, vector<double>> next =
