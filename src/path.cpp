@@ -9,6 +9,7 @@
 #include <iostream>
 #include <limits>
 #include <vector>
+#include <tuple>
 
 #include "path.h"
 #include "spline.h"
@@ -89,6 +90,8 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
       path.push_back(point);
     }
   } else {
+    Path prev_car_path = MapPathToCarPath(sdc_state, prev_map_path);
+    DumpPath("prev_car_path", prev_car_path);
     // Add samples from previous path to the new reference path.
     // However the last path might be very short if the speed is low.
     // So make sure that we get to a minimum length
@@ -182,7 +185,7 @@ Path GenerateSDCPathByTimeSamples(const Path &ref_path_map,
       // the angle at this point and then use some trig to get the actual x and
       // sample the spline again.
       double approx_y = spline(x + target_distance);
-      double theta = atan2((approx_y - y), (target_distance - x));
+      double theta = atan2((approx_y - y), target_distance);
       double incremental_x = (target_distance * cos(theta));
       x = x + incremental_x;
     }
@@ -192,7 +195,10 @@ Path GenerateSDCPathByTimeSamples(const Path &ref_path_map,
     // Update our speed for the next waypoint
     v = std::max(0.0, std::min(v + accel * time_step, max_speed));
   }
-  //  DumpPath("time_sampled_path_car", time_sampled_path);
+  for(int ii  =0; ii < time_sampled_path.size() - 1; ++ii) {
+      assert(time_sampled_path[ii].x <=time_sampled_path[ii +1].x);
+  }
+  DumpPath("time_sampled_path_car", time_sampled_path);
   // Convert the time_sampled_path back to map coords.
   return CarPathToMapPath(sdc_state, time_sampled_path);
 }

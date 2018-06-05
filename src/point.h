@@ -6,6 +6,7 @@
 #define PATH_PLANNING_POINT_H
 
 #include <vector>
+#include <iostream>
 
 struct Point {
   Point();

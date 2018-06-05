@@ -54,13 +54,12 @@ int main() {
 
   //  ofstream refpath_stream("ref_path.csv");
   //
-
-  h.onMessage([lane, &map_state, &car_state_stream](
+  int count = 0;
+  h.onMessage([lane, &map_state, &car_state_stream, &count](
                   uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                   uWS::OpCode opCode) {
     constexpr double kTimeStep = 1.0 / 50;
     constexpr double kTimeHorizon = 1.0;
-
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -70,6 +69,7 @@ int main() {
       auto s = hasData(data);
 
       if (s != "") {
+        cout << "-----------------------------------iteration " << count++ << endl;
         auto j = json::parse(s);
 
         string event = j[0].get<string>();
@@ -94,6 +94,7 @@ int main() {
           auto previous_path_y = j[1]["previous_path_y"];
           Path prev_path_map =
               PathFromVectors(previous_path_x, previous_path_y);
+          DumpPath("prev_path_map", prev_path_map);
 
           // Previous path's end s and d values
           double end_path_s = j[1]["end_path_s"];
@@ -160,6 +161,7 @@ int main() {
           // this_thread::sleep_for(chrono::milliseconds(1000));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
+        cout << endl;
       } else {
         // Manual driving
         std::string msg = "42[\"manual\",{}]";
