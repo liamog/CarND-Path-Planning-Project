@@ -59,7 +59,7 @@ int main() {
                   uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                   uWS::OpCode opCode) {
     constexpr double kTimeStep = 1.0 / 50;
-    constexpr double kTimeHorizon = 1.0;
+    constexpr double kTimeHorizon = 2.0;
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
