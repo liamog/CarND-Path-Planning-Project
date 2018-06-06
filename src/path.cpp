@@ -217,36 +217,70 @@ Path GenerateOtherPathByTimeSamples(const CarState &other_state,
   return path;
 }
 
-double PathCost(const Path &time_path, const std::vector<Path> &others) {
+double PathCost(const Path &time_path, const std::vector<Path> &others,
+                const double time_step) {
+  // Adjust these weights and maxes so the cost function will choose
+  // the most optimal path for progress and safety.
   constexpr double kProximityCostWeight = 100.0;
+  constexpr double kMaxProximityFactor = 1000.0;
+
   constexpr double kDistanceTravelledCostWeight = 1.0;
+  constexpr double kMaxDistanceTravelledFactor = 100.0;
+
+  constexpr double kMinDistanceTimeWeight = 10.0;
+  constexpr double kMaxDistanceTimeFactor = 10.0;
 
   // NOTE: Incoming paths should be time sampled paths of the same size.
 
   //  This cost is relative to the cartesian distance between us and them over
   //  time. We only incur this if we get within 10m.
   double min_distance = std::numeric_limits<double>::infinity();
-  for (int ii = 0; ii < time_path.size(); ii += 2) {
+  double min_distance_time = 0;
+  for (int ii = 0; ii < time_path.size(); ii += 1) {
     for (const Path &other_path : others) {
       // Assume that the other car is following it's lane from it's current
       // position with its current speed.
       // Then compare this with our location.
       const double dist = distance(other_path[ii], time_path[ii]);
       // If we get within 10 meters of another vehicle, then take a cost.
-      if (dist < 10.0) {
-        min_distance = std::min(min_distance, dist);
+      if (dist < 10.0 && dist < min_distance) {
+        min_distance_time = ii * time_step;
+        min_distance = dist;
       }
     }
   }
-  const double min_dist_to_car_cost = (1 / min_distance) * kProximityCostWeight;
 
+  // Calculate total distance travelled.
   const double distance_travelled =
       distance(time_path.front(), time_path.back());
-  // Calculate total distance travelled.
-  const double distance_travelled_cost =
-      (1.0 / distance_travelled) * kDistanceTravelledCostWeight;
 
-  return min_dist_to_car_cost + distance_travelled_cost;
+  const double min_distance_factor =
+      std::min(kMaxProximityFactor, 1.0 / min_distance);
+  const double min_distance_time_factor =
+      std::min(kMaxDistanceTimeFactor, 1.0 / min_distance_time);
+  const double distance_travelled_factor =
+      std::min(kMaxDistanceTravelledFactor, 1.0 / distance_travelled);
+
+  const double min_dist_to_car_cost =
+      min_distance_factor * kProximityCostWeight;
+  const double min_distance_time_cost =
+      min_distance_time_factor * kMinDistanceTimeWeight;
+  const double distance_travelled_cost =
+      distance_travelled_factor * kDistanceTravelledCostWeight;
+
+  cout << "COST:"
+       << "min_dist_to_car:" << min_distance << ",f(" << min_distance_factor
+       << "),c(" << min_dist_to_car_cost << ")" << endl
+       << "\t"
+       << "time_to_min_dist:" << min_distance_time * .02 << ",f("
+       << min_distance_time_factor << "),c(" << min_distance_time_cost << endl
+       << "\t"
+       << "distance_travelled:" << distance_travelled << ",f("
+       << distance_travelled_factor << "),c(" << distance_travelled_cost << ")"
+       << endl;
+
+  return min_dist_to_car_cost + distance_travelled_cost +
+         min_distance_time_cost;
 }
 
 Plan GeneratePathAndCost(const std::string &plan_name,
@@ -263,7 +297,7 @@ Plan GeneratePathAndCost(const std::string &plan_name,
       GenerateSDCPathByTimeSamples(ref_path_map, prev_path_map, sdc_state,
                                    accel, max_speed, time_step, time_horizon);
 
-  double path_cost = PathCost(drivable_path, others);
+  double path_cost = PathCost(drivable_path, others, time_step);
   cout << plan_name << " cost = " << path_cost << endl;
   return std::make_tuple(plan_name, path_cost, drivable_path);
 };

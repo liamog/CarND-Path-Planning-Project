@@ -30,6 +30,8 @@ class CarState {
   std::string ToCsvString() const;
   static std::string CsvStringHeader();
 
+  std::vector<int> GetPossibleLanes();
+
  private:
   double s_ = 0.0;
   double d_ = 0.0;

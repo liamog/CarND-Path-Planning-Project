@@ -43,8 +43,6 @@ int main() {
   uWS::Hub h;
   double reference_velocity_mps = mph_to_mps(45);  // 49.5 mph in m/s
 
-  int lane = 1;
-
   // Load map state
   MapState map_state;
   map_state.LoadMapState("../data/highway_map.csv");
@@ -55,9 +53,9 @@ int main() {
   //  ofstream refpath_stream("ref_path.csv");
   //
   int count = 0;
-  h.onMessage([lane, &map_state, &car_state_stream, &count](
-                  uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
-                  uWS::OpCode opCode) {
+  h.onMessage([&map_state, &car_state_stream, &count](
+      uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+      uWS::OpCode opCode) {
     constexpr double kTimeStep = 1.0 / 50;
     constexpr double kTimeHorizon = 2.0;
     // "42" at the start of the message means there's a websocket message event.
@@ -69,7 +67,8 @@ int main() {
       auto s = hasData(data);
 
       if (s != "") {
-        cout << "-----------------------------------iteration " << count++ << endl;
+        cout << "-----------------------------------iteration " << count++
+             << endl;
         auto j = json::parse(s);
 
         string event = j[0].get<string>();
@@ -134,19 +133,27 @@ int main() {
 
           std::priority_queue<Plan, std::deque<Plan>, decltype(cmp)> plans(cmp);
 
-          // Accel
-          plans.push(GeneratePathAndCost(
-              "Accel:1", prev_path_map, sdc_state, others, map_state,
-              end_path_s_d, 1, kMaxAccel, kMaxSpeed, kTimeStep, kTimeHorizon));
-          // Maintain speed
-          plans.push(GeneratePathAndCost(
-              "Maintain:1", prev_path_map, sdc_state, others, map_state,
-              end_path_s_d, 1, kNoAccel, kMaxSpeed, kTimeStep, kTimeHorizon));
+          vector<int> lanes = sdc_state.GetPossibleLanes();
 
-          // Brake
-          plans.push(GeneratePathAndCost(
-              "brake:1", prev_path_map, sdc_state, others, map_state,
-              end_path_s_d, 1, kMinAccel, kMaxSpeed, kTimeStep, kTimeHorizon));
+          for (int lane : lanes) {
+              // Accel
+              plans.push(GeneratePathAndCost(
+                  "Accel:1", prev_path_map, sdc_state, others, map_state,
+                  end_path_s_d, 1, kMaxAccel, kMaxSpeed, kTimeStep,
+                  kTimeHorizon));
+              // Maintain speed
+              plans.push(GeneratePathAndCost(
+                  "Maintain:1", prev_path_map, sdc_state, others, map_state,
+                  end_path_s_d, 1, kNoAccel, kMaxSpeed, kTimeStep,
+                  kTimeHorizon));
+
+              // Brake
+              plans.push(GeneratePathAndCost(
+                  "brake:1", prev_path_map, sdc_state, others, map_state,
+                  end_path_s_d, 1, kMinAccel, kMaxSpeed, kTimeStep,
+                  kTimeHorizon));
+          }
+
 
           cout << "Selected " << get<0>(plans.top());
           std::pair<vector<double>, vector<double>> next =

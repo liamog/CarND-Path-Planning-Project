@@ -49,7 +49,8 @@ Path GenerateOtherPathByTimeSamples(const CarState &other_state,
                                     const double time_horizon,
                                     const MapState &map_state);
 
-double PathCost(const Path &time_path, const std::vector<Path> &others);
+double PathCost(const Path &time_path, const std::vector<Path> &others,
+                const double time_step);
 
 typedef std::tuple<std::string, double, Path> Plan;
 

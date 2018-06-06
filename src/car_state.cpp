@@ -29,27 +29,40 @@ std::string CarState::ToString() const {
 
 std::string CarState::ToCsvString() const {
   std::stringstream retval;
-  retval << s_ << ","
-         << d_ << ","
-         << point_.x << ","
-         << point_.y << ","
-         << v_ << ","
-         << yaw_rad_ << ","
-         << rad_to_deg(yaw_rad_) << ","
-         << Lane();
+  retval << s_ << "," << d_ << "," << point_.x << "," << point_.y << "," << v_
+         << "," << yaw_rad_ << "," << rad_to_deg(yaw_rad_) << "," << Lane();
   return retval.str();
 }
 
 // static
 std::string CarState::CsvStringHeader() {
   std::stringstream retval;
-  retval << "s" << ","
-         << "d" << ","
-         << "x" << ","
-         << "y" << ","
-         << "v" << ","
-         << "yaw_rad" << ","
-         << "yaw_deg" << ","
+  retval << "s"
+         << ","
+         << "d"
+         << ","
+         << "x"
+         << ","
+         << "y"
+         << ","
+         << "v"
+         << ","
+         << "yaw_rad"
+         << ","
+         << "yaw_deg"
+         << ","
          << "lane";
   return retval.str();
+}
+
+// Return the set of possible lanes from the car's current position.
+std::vector<int> CarState::GetPossibleLanes() {
+  std::vector<int> possible_lanes;
+  possible_lanes.push_back(Lane());
+  if (Lane() + 1 <= 2) {
+    possible_lanes.push_back(Lane() + 1);
+  }
+  if (Lane() - 1 >= 0) {
+    possible_lanes.push_back(Lane() - 1);
+  }
 }
