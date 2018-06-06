@@ -139,18 +139,18 @@ int main() {
               // Accel
               plans.push(GeneratePathAndCost(
                   "Accel:1", prev_path_map, sdc_state, others, map_state,
-                  end_path_s_d, 1, kMaxAccel, kMaxSpeed, kTimeStep,
+                  end_path_s_d, lane, kMaxAccel, kMaxSpeed, kTimeStep,
                   kTimeHorizon));
               // Maintain speed
               plans.push(GeneratePathAndCost(
                   "Maintain:1", prev_path_map, sdc_state, others, map_state,
-                  end_path_s_d, 1, kNoAccel, kMaxSpeed, kTimeStep,
+                  end_path_s_d, lane, kNoAccel, kMaxSpeed, kTimeStep,
                   kTimeHorizon));
 
               // Brake
               plans.push(GeneratePathAndCost(
                   "brake:1", prev_path_map, sdc_state, others, map_state,
-                  end_path_s_d, 1, kMinAccel, kMaxSpeed, kTimeStep,
+                  end_path_s_d, lane, kMinAccel, kMaxSpeed, kTimeStep,
                   kTimeHorizon));
           }
 

@@ -65,4 +65,5 @@ std::vector<int> CarState::GetPossibleLanes() {
   if (Lane() - 1 >= 0) {
     possible_lanes.push_back(Lane() - 1);
   }
+  return  possible_lanes;
 }
