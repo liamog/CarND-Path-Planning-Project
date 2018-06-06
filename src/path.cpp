@@ -8,8 +8,8 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
-#include <vector>
 #include <tuple>
+#include <vector>
 
 #include "path.h"
 #include "spline.h"
@@ -91,14 +91,13 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
     }
   } else {
     Path prev_car_path = MapPathToCarPath(sdc_state, prev_map_path);
-    DumpPath("prev_car_path", prev_car_path);
+    // DumpPath("prev_car_path", prev_car_path);
     // Add samples from previous path to the new reference path.
     // However the last path might be very short if the speed is low.
     // So make sure that we get to a minimum length
     double path_length = 0.0;
     constexpr double kMinRefPathLength = 100.0;
 
-//    path.emplace_back(prev_map_path[0]);
     double s, d;
     std::tie(s, d) = end_path_s_d;
     double path_s_length = s - sdc_state.s();
@@ -154,7 +153,7 @@ Path GenerateSDCPathByTimeSamples(const Path &ref_path_map,
   Path prev_path_car = MapPathToCarPath(sdc_state, prev_path_map);
   //  DumpPath("prev_path_car", prev_path_car);
   Path ref_path_car = MapPathToCarPath(sdc_state, ref_path_map);
-  DumpPath("ref_path_car", ref_path_car);
+  // DumpPath("ref_path_car", ref_path_car);
   tk::spline spline;
   pair<vector<double>, vector<double>> ref = VectorsFromPath(ref_path_car);
   spline.set_points(ref.first, ref.second);
@@ -195,10 +194,10 @@ Path GenerateSDCPathByTimeSamples(const Path &ref_path_map,
     // Update our speed for the next waypoint
     v = std::max(0.0, std::min(v + accel * time_step, max_speed));
   }
-  for(int ii  =0; ii < time_sampled_path.size() - 1; ++ii) {
-      assert(time_sampled_path[ii].x <=time_sampled_path[ii +1].x);
+  for (int ii = 0; ii < time_sampled_path.size() - 1; ++ii) {
+    assert(time_sampled_path[ii].x <= time_sampled_path[ii + 1].x);
   }
-  DumpPath("time_sampled_path_car", time_sampled_path);
+  //  DumpPath("time_sampled_path_car", time_sampled_path);
   // Convert the time_sampled_path back to map coords.
   return CarPathToMapPath(sdc_state, time_sampled_path);
 }
@@ -222,7 +221,10 @@ double PathCost(const Path &time_path, const std::vector<Path> &others) {
   constexpr double kProximityCostWeight = 100.0;
   constexpr double kDistanceTravelledCostWeight = 1.0;
 
-  // Incoming paths should be time sampled paths of the same size.
+  // NOTE: Incoming paths should be time sampled paths of the same size.
+
+  //  This cost is relative to the cartesian distance between us and them over
+  //  time. We only incur this if we get within 10m.
   double min_distance = std::numeric_limits<double>::infinity();
   for (int ii = 0; ii < time_path.size(); ii += 2) {
     for (const Path &other_path : others) {

@@ -72,8 +72,8 @@ TEST(TimeSampledPath, GenerateSDCPathByTimeSamplesBraking) {
       sdc_state.Lane(), map_state);
 
   Path drivable_path =
-      GenerateSDCPathByTimeSamples(ref_path, prev_path_map, sdc_state,
-                                   -2.0, mph_to_mps(49.5), 1.0 / 50.0, 1.0);
+      GenerateSDCPathByTimeSamples(ref_path, prev_path_map, sdc_state, -2.0,
+                                   mph_to_mps(49.5), 1.0 / 50.0, 1.0);
   const double dist = distance(drivable_path.front(), drivable_path.back());
   EXPECT_LT(dist, 0.001);
 }
