@@ -49,7 +49,7 @@ Path GenerateOtherPathByTimeSamples(const CarState &other_state,
                                     const MapState &map_state);
 
 // Calculate the cost value for a particular path.
-double PathCost(const CarState &sdc_state, const Path &time_path,
+double PathCost(const CarState &sdc_state, const Path &sdc_path,
                 const std::vector<Path> &others, const double time_step);
 
 typedef std::tuple<std::string, double, Path> Plan;

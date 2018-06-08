@@ -222,12 +222,15 @@ Path GenerateOtherPathByTimeSamples(const CarState &other_state,
   return path;
 }
 
-double PathCost(const CarState &sdc_state, const Path &time_path,
+double PathCost(const CarState &sdc_state, const Path &sdc_path,
                 const std::vector<Path> &others, const double time_step) {
   // Adjust these weights and maxes so the cost function will choose
   // the most optimal path for progress and safety.
-  constexpr double kProximityCostWeight = 100.0;
-  constexpr double kMaxProximityFactor = 1000.0;
+  constexpr double kProximityCostWeight = 50.0;
+  constexpr double kMaxProximityFactor = 500.0;
+
+  constexpr double kCollisionCostWeight = 100.0;
+  constexpr double kMaxCollisionFactor = 1000.0;
 
   constexpr double kDistanceTravelledCostWeight = 1.0;
   constexpr double kMaxDistanceTravelledFactor = 100.0;
@@ -241,12 +244,12 @@ double PathCost(const CarState &sdc_state, const Path &time_path,
   //  time. We only incur this if we get within 10m.
   double min_distance = std::numeric_limits<double>::infinity();
   double min_distance_time = 0;
-  for (int ii = 0; ii < time_path.size(); ii += 1) {
+  for (int ii = 0; ii < sdc_path.size(); ii += 1) {
     for (const Path &other_path : others) {
       // Assume that the other car is following it's lane from it's current
       // position with its current speed.
       // Then compare this with our location.
-      const double dist = Distance(other_path[ii], time_path[ii]);
+      const double dist = Distance(other_path[ii], sdc_path[ii]);
       // If we get within 10 meters of another vehicle, then take a cost.
       if (dist < 10.0 && dist < min_distance) {
         min_distance_time = ii * time_step;
@@ -255,9 +258,36 @@ double PathCost(const CarState &sdc_state, const Path &time_path,
     }
   }
 
+  // This value is the distance to car ahead in lane, it only captures the
+  // min distance if the states are in the same lane, so it will capture
+  // a lane change behind another vehicle.
+  double in_lane_proximity = std::numeric_limits<double>::infinity();
+  double in_lane_min_proximity_time = 0;
+  for (int ii = 0; ii < sdc_path.size(); ii += 1) {
+    for (const Path &other_path : others) {
+      if (frenet_d_to_lane(other_path[ii].d) !=
+          frenet_d_to_lane(sdc_path[ii].d)) {
+        continue;
+      }
+      const double dist = other_path[ii].s - sdc_path[ii].s;
+      // If the other car is behind us don't count it.
+      if (dist < 0.0) continue;
+
+      // If we get within 10 meters of another vehicle, then take a cost.
+      if (dist < 10.0 && dist < min_distance) {
+        in_lane_min_proximity_time = ii * time_step;
+        in_lane_proximity = dist;
+      }
+    }
+  }
+
+  if (min_distance < 1.0) {
+    // We have a collision.
+
+  }
+
   // Calculate total Distance travelled.
-  const double distance_travelled =
-      Distance(time_path.front(), time_path.back());
+  const double distance_travelled = sdc_path.back().s - sdc_path.front().s;
 
   // Have a cost for changing lanes.
 
