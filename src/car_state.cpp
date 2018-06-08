@@ -9,28 +9,30 @@
 
 CarState::CarState(double x, double y, double s, double d, double v,
                    double yaw_deg)
-    : s_(s), d_(d), yaw_rad_(deg_to_rad(yaw_deg)), v_(v), point_(x, y) {
+    : v_(v), point_(x, y, deg_to_rad(yaw_deg), s, d) {
   lane_ = frenet_d_to_lane(d);
 }
 
 // Constructor for other road users.
 CarState::CarState(double x, double y, double s, double d, double v)
-    : s_(s), d_(d), point_(x, y), v_(v) {
+    :point_(x, y, 0.0, s, d), v_(v) {
   lane_ = frenet_d_to_lane(d);
 }
+
+int CarState::Lane() const { return frenet_d_to_lane(d()); }
 
 std::string CarState::ToString() const {
   std::stringstream retval;
   retval << "x=" << point_.x << ";y=" << point_.y << ";v=" << v_
-         << ";yaw=" << yaw_rad_ << ";yaw_deg=" << rad_to_deg(yaw_rad_)
+         << ";yaw=" << yaw_rad() << ";yaw_deg=" << rad_to_deg(yaw_rad())
          << ";l=" << Lane();
   return retval.str();
 }
 
 std::string CarState::ToCsvString() const {
   std::stringstream retval;
-  retval << s_ << "," << d_ << "," << point_.x << "," << point_.y << "," << v_
-         << "," << yaw_rad_ << "," << rad_to_deg(yaw_rad_) << "," << Lane();
+  retval << s() << "," << d() << "," << point_.x << "," << point_.y << "," << v_
+         << "," << point_.theta << "," << rad_to_deg(point_.theta) << "," << Lane();
   return retval.str();
 }
 

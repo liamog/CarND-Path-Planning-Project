@@ -15,10 +15,8 @@ void DumpPath(const char *name, const Path &path);
 
 Path MapPathToCarPath(const CarState &car, const Path &map_path);
 
-Path CarPathToMapPath(const CarState &car, const Path &car_path);
-
-std::vector<Point> PathFromVectors(const std::vector<double> &x,
-                                   const std::vector<double> &y);
+Path CarPathToMapPath(const MapState &map_state, const CarState &car,
+                      const Path &car_path);
 
 std::pair<std::vector<double>, std::vector<double>> VectorsFromPath(
     const Path &path);
@@ -36,7 +34,8 @@ Path GenerateReferencePath(const Path &prev_path, const CarState &sdc_state,
 // Generate a path for the SDC from the previous path + the reference path
 // + current SDC state, given a time step and time horizon a constant accel
 // and a maximum speed.
-Path GenerateSDCPathByTimeSamples(const Path &ref_path_map,
+Path GenerateSDCPathByTimeSamples(const MapState &map_state,
+                                  const Path &ref_path_map,
                                   const Path &prev_path_map,
                                   const CarState &sdc_state, double accel,
                                   double max_speed, double time_step,
@@ -49,8 +48,9 @@ Path GenerateOtherPathByTimeSamples(const CarState &other_state,
                                     const double time_horizon,
                                     const MapState &map_state);
 
-double PathCost(const Path &time_path, const std::vector<Path> &others,
-                const double time_step);
+// Calculate the cost value for a particular path.
+double PathCost(const CarState &sdc_state, const Path &time_path,
+                const std::vector<Path> &others, const double time_step);
 
 typedef std::tuple<std::string, double, Path> Plan;
 

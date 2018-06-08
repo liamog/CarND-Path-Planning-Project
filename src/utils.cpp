@@ -19,7 +19,7 @@ double rad_to_deg(double x) { return x * 180 / M_PI; }
 // Speed conversion
 double mph_to_mps(double mph) { return mph * 0.44704; }
 
-// Lane to lateral distance (frenet)
+// Lane to lateral Distance (frenet)
 double lane_to_frenet_d(int lane) { return lane * 4.0 + 2.0; }
 
 int frenet_d_to_lane(double frenet) { return frenet / 4.0; }
@@ -31,7 +31,7 @@ int ClosestWaypoint(double x, double y, const MapState &map_state) {
   for (int i = 0; i < map_state.map_waypoints_x().size(); i++) {
     double map_x = map_state.map_waypoints_x()[i];
     double map_y = map_state.map_waypoints_y()[i];
-    double dist = distance(x, y, map_x, map_y);
+    double dist = Distance(x, y, map_x, map_y);
     if (dist < closestLen) {
       closestLen = dist;
       closestWaypoint = i;
@@ -62,12 +62,7 @@ int NextWaypoint(double x, double y, double theta, const MapState &map_state) {
   return closestWaypoint;
 }
 
-std::vector<double> Point::ToVector() {
-  std::vector<double> val({x, y});
-  return val;
-}
-
-Point map2car(const Point &car_in_map, double psi, const Point &input) {
+Point Map2Car(const Point &car_in_map, double psi, const Point &input) {
   double s = sin(-psi);
   double c = cos(-psi);
   // Move to origin
@@ -77,10 +72,12 @@ Point map2car(const Point &car_in_map, double psi, const Point &input) {
   // Rotate by psi
   point_in_car_coords.x = (x * c) - (y * s);
   point_in_car_coords.y = (x * s) + (y * c);
+  point_in_car_coords.theta = input.theta - psi;
+
   return point_in_car_coords;
 }
 
-Point car2map(const Point &car_in_map, double psi, const Point &input) {
+Point Car2Map(const Point &car_in_map, double psi, const Point &input) {
   double s = sin(psi);
   double c = cos(psi);
 
@@ -92,19 +89,33 @@ Point car2map(const Point &car_in_map, double psi, const Point &input) {
   Point point_in_map_coords;
   point_in_map_coords.x = car_in_map.x + x_rot;
   point_in_map_coords.y = car_in_map.y + y_rot;
+  point_in_map_coords.theta = car_in_map.theta + psi;
+
   return point_in_map_coords;
 }
 
-double distance(const Point &p1, const Point &p2) {
-  return distance(p1.x, p1.y, p2.x, p2.y);
+double Distance(const Point &p1, const Point &p2) {
+  return Distance(p1.x, p1.y, p2.x, p2.y);
 }
 
-double distance(double x1, double y1, double x2, double y2) {
+double Distance(double x1, double y1, double x2, double y2) {
   return sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
 }
 
+void UpdateFrenetForPoint(const MapState &map_state, Point *point) {
+  std::vector<double> frenet = GetFrenet(point->x, point->y, point->theta, map_state);
+  point->s = frenet[0];
+  point->d = frenet[1];
+}
+
+void UpdateFrenet(const MapState &map_state, Path *path) {
+  for (Point &p : *path) {
+    UpdateFrenetForPoint(map_state, &p);
+  }
+}
+
 // Transform from Cartesian x,y coordinates to Frenet s,d coordinates
-vector<double> getFrenet(double x, double y, double theta,
+vector<double> GetFrenet(double x, double y, double theta,
                          const MapState &map_state) {
   int next_wp = NextWaypoint(x, y, theta, map_state);
 
@@ -126,14 +137,14 @@ vector<double> getFrenet(double x, double y, double theta,
   double proj_x = proj_norm * n_x;
   double proj_y = proj_norm * n_y;
 
-  double frenet_d = distance(x_x, x_y, proj_x, proj_y);
+  double frenet_d = Distance(x_x, x_y, proj_x, proj_y);
 
   // see if d value is positive or negative by comparing it to a center point
 
   double center_x = 1000 - map_state.map_waypoints_x()[prev_wp];
   double center_y = 2000 - map_state.map_waypoints_y()[prev_wp];
-  double centerToPos = distance(center_x, center_y, x_x, x_y);
-  double centerToRef = distance(center_x, center_y, proj_x, proj_y);
+  double centerToPos = Distance(center_x, center_y, x_x, x_y);
+  double centerToRef = Distance(center_x, center_y, proj_x, proj_y);
 
   if (centerToPos <= centerToRef) {
     frenet_d *= -1;
@@ -142,18 +153,18 @@ vector<double> getFrenet(double x, double y, double theta,
   // calculate s value
   double frenet_s = 0;
   for (int i = 0; i < prev_wp; i++) {
-    frenet_s += distance(
+    frenet_s += Distance(
         map_state.map_waypoints_x()[i], map_state.map_waypoints_y()[i],
         map_state.map_waypoints_x()[i + 1], map_state.map_waypoints_y()[i + 1]);
   }
 
-  frenet_s += distance(0, 0, proj_x, proj_y);
+  frenet_s += Distance(0, 0, proj_x, proj_y);
 
   return {frenet_s, frenet_d};
 }
 
 // Transform from Frenet s,d coordinates to Cartesian x,y
-Point getXY(double s, double d, const MapState &map_state) {
+Point GetXY(double s, double d, const MapState &map_state) {
   int prev_wp = -1;
 
   while (s > map_state.map_waypoints_s()[prev_wp + 1] &&
@@ -178,5 +189,5 @@ Point getXY(double s, double d, const MapState &map_state) {
   double x = seg_x + d * cos(perp_heading);
   double y = seg_y + d * sin(perp_heading);
 
-  return Point(x, y);
+  return Point(x, y, heading, s, d);
 }

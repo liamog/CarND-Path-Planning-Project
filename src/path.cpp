@@ -13,6 +13,7 @@
 
 #include "path.h"
 #include "spline.h"
+#include "utils.h"
 
 using namespace std;
 
@@ -24,24 +25,25 @@ void DumpPath(const char *name, const Path &path) {
   cout << endl;
 }
 
-vector<Point> MapPathToCarPath(const CarState &car,
-                               const std::vector<Point> &map_path) {
-  vector<Point> car_path;
+Path MapPathToCarPath(const CarState &car, const Path &map_path) {
+  Path car_path;
   car_path.reserve(map_path.size());
   for (const Point &map_point : map_path) {
-    car_path.emplace_back(map2car(car.point(), car.yaw_rad(), map_point));
+    car_path.emplace_back(Map2Car(car.point(), car.yaw_rad(), map_point));
   }
   //  DumpPath("MapPathToCarPath", car_path);
   return car_path;
 }
 
-vector<Point> CarPathToMapPath(const CarState &car,
-                               const std::vector<Point> &car_path) {
-  vector<Point> map_path;
+Path CarPathToMapPath(const MapState &map_state, const CarState &car,
+                      const Path &car_path) {
+  Path map_path;
   map_path.reserve(car_path.size());
   for (const Point &car_point : car_path) {
-    map_path.emplace_back(car2map(car.point(), car.yaw_rad(), car_point));
+    map_path.emplace_back(Car2Map(car.point(), car.yaw_rad(), car_point));
   }
+  // Update the frenet values.
+  UpdateFrenet(map_state, &map_path);
   //  DumpPath("CarPathToMapPath", map_path);
   return map_path;
 }
@@ -62,19 +64,20 @@ std::pair<std::vector<double>, std::vector<double>> VectorsFromPath(
 
 Path PathFromVectors(const std::vector<double> &x,
                      const std::vector<double> &y) {
-  std::vector<Point> points;
+  Path points;
   points.reserve(x.size());
   for (int ii = 0; ii < x.size(); ++ii) {
-    points.emplace_back(x[ii], y[ii]);
+    double theta = (ii < x.size() - 1)
+                       ? points[ii - 1].theta
+                       : atan2(y[ii + 1] - y[ii], x[ii + 1] - x[ii]);
+    points.emplace_back(x[ii], y[ii], theta);
   }
   return points;
 }
 
-vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
-                                    const CarState &sdc_state,
-                                    std::tuple<double, double> end_path_s_d,
-                                    const int target_lane,
-                                    const MapState &map_state) {
+Path GenerateReferencePath(const Path &prev_map_path, const CarState &sdc_state,
+                           std::tuple<double, double> end_path_s_d,
+                           const int target_lane, const MapState &map_state) {
   // Create a reference set of waypoints that includes the current
   // car position.
   Path path;
@@ -86,7 +89,7 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
     for (int ii = 1; ii <= 3; ii++) {
       double s = sdc_state.s() + (kSpacing * ii);
       double d = lane_to_frenet_d(target_lane);
-      Point point = getXY(s, d, map_state);
+      Point point = GetXY(s, d, map_state);
       path.push_back(point);
     }
   } else {
@@ -120,7 +123,7 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
          path_s_length += kSpacing) {
       double new_s = sdc_state.s() + path_s_length;
       double new_d = lane_to_frenet_d(target_lane);
-      Point point = getXY(new_s, new_d, map_state);
+      Point point = GetXY(new_s, new_d, map_state);
 
       path.push_back(point);
     }
@@ -145,7 +148,8 @@ vector<Point> GenerateReferencePath(const std::vector<Point> &prev_map_path,
   return path;
 }
 
-Path GenerateSDCPathByTimeSamples(const Path &ref_path_map,
+Path GenerateSDCPathByTimeSamples(const MapState &map_state,
+                                  const Path &ref_path_map,
                                   const Path &prev_path_map,
                                   const CarState &sdc_state, double accel,
                                   double max_speed, double time_step,
@@ -164,33 +168,34 @@ Path GenerateSDCPathByTimeSamples(const Path &ref_path_map,
 
   double v = std::min(sdc_state.v(), max_speed);
   // Build a path of way points sampled from the spline waypoints (spatial).
-  // so they cover the distance we want to travel in the time step.
+  // so they cover the Distance we want to travel in the time step.
   Path time_sampled_path;
   double x = 0.0, y = 0.0;
   for (int ii = 0, jj = 0; ii < kTimeSamples; ++ii) {
     if (ii < prev_path_car.size()) {
       time_sampled_path.emplace_back(prev_path_car[ii]);
-      v = distance(x, y, prev_path_car[ii].x, prev_path_car[ii].y) / time_step;
+      v = Distance(x, y, prev_path_car[ii].x, prev_path_car[ii].y) / time_step;
       x = prev_path_car[ii].x;
       y = prev_path_car[ii].y;
       continue;
     }
+    double theta = 0.0;
 
     double target_distance =
         (v * time_step) + (0.5 * accel * time_step * time_step);
     if (target_distance > 0.00001) {
-      // First sample the spline with x= our target distance.
-      // This gives us too large a distance but we can use this to approximate
+      // First sample the spline with x= our target Distance.
+      // This gives us too large a Distance but we can use this to approximate
       // the angle at this point and then use some trig to get the actual x and
       // sample the spline again.
       double approx_y = spline(x + target_distance);
-      double theta = atan2((approx_y - y), target_distance);
+      theta = atan2((approx_y - y), target_distance);
       double incremental_x = (target_distance * cos(theta));
       x = x + incremental_x;
     }
     y = spline(x);
 
-    time_sampled_path.emplace_back(x, y);
+    time_sampled_path.emplace_back(x, y, theta);
     // Update our speed for the next waypoint
     v = std::max(0.0, std::min(v + accel * time_step, max_speed));
   }
@@ -199,7 +204,7 @@ Path GenerateSDCPathByTimeSamples(const Path &ref_path_map,
   }
   //  DumpPath("time_sampled_path_car", time_sampled_path);
   // Convert the time_sampled_path back to map coords.
-  return CarPathToMapPath(sdc_state, time_sampled_path);
+  return CarPathToMapPath(map_state, sdc_state, time_sampled_path);
 }
 
 Path GenerateOtherPathByTimeSamples(const CarState &other_state,
@@ -210,15 +215,15 @@ Path GenerateOtherPathByTimeSamples(const CarState &other_state,
   // Start with just frenet coorindates and increment the s according to v.
   Path path;
   for (double t = 0; t < time_horizon; t += time_step) {
-    Point point = getXY(other_state.s() + (other_state.v() * t),
+    Point point = GetXY(other_state.s() + (other_state.v() * t),
                         other_state.d(), map_state);
     path.push_back(point);
   }
   return path;
 }
 
-double PathCost(const Path &time_path, const std::vector<Path> &others,
-                const double time_step) {
+double PathCost(const CarState &sdc_state, const Path &time_path,
+                const std::vector<Path> &others, const double time_step) {
   // Adjust these weights and maxes so the cost function will choose
   // the most optimal path for progress and safety.
   constexpr double kProximityCostWeight = 100.0;
@@ -232,7 +237,7 @@ double PathCost(const Path &time_path, const std::vector<Path> &others,
 
   // NOTE: Incoming paths should be time sampled paths of the same size.
 
-  //  This cost is relative to the cartesian distance between us and them over
+  //  This cost is relative to the cartesian Distance between us and them over
   //  time. We only incur this if we get within 10m.
   double min_distance = std::numeric_limits<double>::infinity();
   double min_distance_time = 0;
@@ -241,7 +246,7 @@ double PathCost(const Path &time_path, const std::vector<Path> &others,
       // Assume that the other car is following it's lane from it's current
       // position with its current speed.
       // Then compare this with our location.
-      const double dist = distance(other_path[ii], time_path[ii]);
+      const double dist = Distance(other_path[ii], time_path[ii]);
       // If we get within 10 meters of another vehicle, then take a cost.
       if (dist < 10.0 && dist < min_distance) {
         min_distance_time = ii * time_step;
@@ -250,9 +255,11 @@ double PathCost(const Path &time_path, const std::vector<Path> &others,
     }
   }
 
-  // Calculate total distance travelled.
+  // Calculate total Distance travelled.
   const double distance_travelled =
-      distance(time_path.front(), time_path.back());
+      Distance(time_path.front(), time_path.back());
+
+  // Have a cost for changing lanes.
 
   const double min_distance_factor =
       std::min(kMaxProximityFactor, 1.0 / min_distance);
@@ -293,11 +300,11 @@ Plan GeneratePathAndCost(const std::string &plan_name,
   // Generate a reference path for the current lane in map co-ordinates.
   Path ref_path_map = GenerateReferencePath(
       prev_path_map, sdc_state, end_path_s_d, target_lane, map_state);
-  Path drivable_path =
-      GenerateSDCPathByTimeSamples(ref_path_map, prev_path_map, sdc_state,
-                                   accel, max_speed, time_step, time_horizon);
+  Path drivable_path = GenerateSDCPathByTimeSamples(
+      map_state, ref_path_map, prev_path_map, sdc_state, accel, max_speed,
+      time_step, time_horizon);
 
-  double path_cost = PathCost(drivable_path, others, time_step);
+  double path_cost = PathCost(sdc_state, drivable_path, others, time_step);
   cout << plan_name << " cost = " << path_cost << endl;
   return std::make_tuple(plan_name, path_cost, drivable_path);
 };

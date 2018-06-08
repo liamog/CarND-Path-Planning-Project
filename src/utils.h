@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "map_state.h"
+#include "path.h"
 #include "point.h"
 
 double deg_to_rad(double x);
@@ -14,21 +15,23 @@ double rad_to_deg(double x);
 // Speed conversion
 double mph_to_mps(double mph);
 
-// Lane to lateral distance (frenet)
+// Lane to lateral Distance (frenet)
 double lane_to_frenet_d(int lane);
 int frenet_d_to_lane(double d);
 
-Point map2car(const Point &car_in_map, double psi, const Point &input);
+Point Map2Car(const Point &car_in_map, double psi, const Point &input);
 
-Point car2map(const Point &car_in_map, double psi, const Point &input);
+Point Car2Map(const Point &car_in_map, double psi, const Point &input);
 
-double distance(const Point &p1, const Point &p2);
-double distance(double x1, double y1, double x2, double y2);
+double Distance(const Point &p1, const Point &p2);
+double Distance(double x1, double y1, double x2, double y2);
 
-Point getXY(double s, double d, const MapState &map_state);
+Point GetXY(double s, double d, const MapState &map_state);
 
-std::vector<double> getFrenet(double x, double y, double theta,
+std::vector<double> GetFrenet(double x, double y, double theta,
                               const MapState &map_state);
+
+void UpdateFrenet(const MapState &map_state, Path *path);
 
 
 #endif  // PATH_PLANNING_UTILS_H

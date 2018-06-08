@@ -123,7 +123,7 @@ int main() {
 
           double kMaxAccel = 6.0;
           double kNoAccel = 0.0;
-          double kMinAccel = -2.0;
+          double kMinAccel = -3.0;
           double kMaxSpeed = mph_to_mps(45);
 
           // Using lambda to compare elements.
@@ -138,22 +138,21 @@ int main() {
           for (int lane : lanes) {
               // Accel
               plans.push(GeneratePathAndCost(
-                  "Accel:1", prev_path_map, sdc_state, others, map_state,
-                  end_path_s_d, lane, kMaxAccel, kMaxSpeed, kTimeStep,
-                  kTimeHorizon));
-              // Maintain speed
-              plans.push(GeneratePathAndCost(
-                  "Maintain:1", prev_path_map, sdc_state, others, map_state,
-                  end_path_s_d, lane, kNoAccel, kMaxSpeed, kTimeStep,
-                  kTimeHorizon));
-
-              // Brake
-              plans.push(GeneratePathAndCost(
-                  "brake:1", prev_path_map, sdc_state, others, map_state,
-                  end_path_s_d, lane, kMinAccel, kMaxSpeed, kTimeStep,
-                  kTimeHorizon));
+                      "Accel:1", prev_path_map, sdc_state, others, map_state,
+                      end_path_s_d, lane, kMaxAccel, kMaxSpeed, kTimeStep,
+                      kTimeHorizon));
           }
+          // Maintain speed
+          plans.push(GeneratePathAndCost(
+              "Maintain:1", prev_path_map, sdc_state, others, map_state,
+              end_path_s_d, sdc_state.Lane(), kNoAccel, kMaxSpeed, kTimeStep,
+              kTimeHorizon));
 
+          // Brake
+          plans.push(GeneratePathAndCost(
+              "brake:1", prev_path_map, sdc_state, others, map_state,
+              end_path_s_d, sdc_state.Lane(), kMinAccel, kMaxSpeed, kTimeStep,
+              kTimeHorizon));
 
           cout << "Selected " << get<0>(plans.top());
           std::pair<vector<double>, vector<double>> next =
