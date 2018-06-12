@@ -67,7 +67,7 @@ int main() {
     // cout << sdata << endl;
     if (length && length > 2 && data[0] == '4' && data[1] == '2') {
       auto s = hasData(data);
-      cout << s;
+      cout << s << endl;
       if (s != "") {
         cout << "-----------------------------------iteration " << count++
              << endl;
@@ -98,14 +98,18 @@ int main() {
               PathFromVectors(previous_path_x, previous_path_y);
           DumpPathForUnitTest("prev_path_map", prev_path_map);
 
-          auto derivatives = CalculateSpeedDerivatives(prev_path_map, kTimeStep);
+          auto derivatives =
+              CalculateSpeedDerivatives(prev_path_map, kTimeStep);
           int count = 0;
           for (const auto &sample : derivatives) {
             double speed, accel, jerk;
             std::tie(speed, accel, jerk) = sample;
-            assert(speed <  mph_to_mps(50.0));
-            assert(accel < 10.0);
-            assert(jerk < 10.0);
+            if (speed > mph_to_mps(50.0))
+              cout << " incoming WARNING speed too high " << speed << endl;
+            if (accel > 10.0)
+              cout << " incoming  WARNING accel too high " << accel << endl;
+            if (jerk > 10.0)
+              cout << "incoming  WARNING jerk too high " << jerk << endl;
             ++count;
           }
 
@@ -137,7 +141,7 @@ int main() {
 
           json msgJson;
 
-          double kMaxAccel = 3.0;
+          double kMaxAccel = 9.0;
           double kNoAccel = 0.0;
           double kMinAccel = -3.0;
           double kMaxSpeed = mph_to_mps(45);
@@ -163,33 +167,36 @@ int main() {
             }
           } else {
             // Accel
-            plans.push(GeneratePathAndCost(
-                "Accel:1", prev_path_map, sdc_state, others, map_state,
-                end_path_s_d, sdc_state.Lane(), kMaxAccel, kMaxSpeed, kTimeStep,
-                kTimeHorizon));
-
+            plans.push(GeneratePathAndCost("Accel:1", prev_path_map, sdc_state,
+                                           others, map_state, end_path_s_d,
+                                           sdc_state.Lane(), kMaxAccel,
+                                           kMaxSpeed, kTimeStep, kTimeHorizon));
           }
 
           // Maintain speed in current lane
-          plans.push(GeneratePathAndCost(
-              "Maintain:1", prev_path_map, sdc_state, others, map_state,
-              end_path_s_d, sdc_state.Lane(), kNoAccel, kMaxSpeed, kTimeStep,
-              kTimeHorizon));
+          plans.push(GeneratePathAndCost("Maintain:1", prev_path_map, sdc_state,
+                                         others, map_state, end_path_s_d,
+                                         sdc_state.Lane(), kNoAccel, kMaxSpeed,
+                                         kTimeStep, kTimeHorizon));
 
           // Brake in current lane
-          plans.push(GeneratePathAndCost(
-              "brake:1", prev_path_map, sdc_state, others, map_state,
-              end_path_s_d, sdc_state.Lane(), kMinAccel, kMaxSpeed, kTimeStep,
-              kTimeHorizon));
+          plans.push(GeneratePathAndCost("brake:1", prev_path_map, sdc_state,
+                                         others, map_state, end_path_s_d,
+                                         sdc_state.Lane(), kMinAccel, kMaxSpeed,
+                                         kTimeStep, kTimeHorizon));
 
           cout << "Selected " << get<0>(plans.top());
-          auto derivatives_new = CalculateSpeedDerivatives(get<2>(plans.top()), kTimeStep);
+          auto derivatives_new =
+              CalculateSpeedDerivatives(get<2>(plans.top()), kTimeStep);
           for (const auto &sample : derivatives_new) {
             double speed, accel, jerk;
             std::tie(speed, accel, jerk) = sample;
-            assert(speed <  mph_to_mps(50.0));
-            assert(accel < 10.0);
-            assert(jerk < 10.0);
+            if (speed > mph_to_mps(50.0))
+              cout << " outgoing WARNING speed too high " << speed << endl;
+            if (accel > 10.0)
+              cout << " outgoing WARNING accel too high " << accel << endl;
+            if (jerk > 10.0)
+              cout << "outgoing WARNING jerk too high " << jerk << endl;
           }
           DumpPathForUnitTest("NextPath", get<2>(plans.top()));
 

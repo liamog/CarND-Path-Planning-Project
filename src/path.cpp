@@ -51,6 +51,30 @@ void DumpPathForUnitTest(const char *name, const Path &path) {
   cout << y_vector.str();
 }
 
+void DumpPathForPlot(const char *name, const Path &path) {
+  stringstream x_vector;
+  stringstream y_vector;
+
+  x_vector.precision(10);
+  x_vector.width(10);
+  y_vector.precision(10);
+  y_vector.width(10);
+
+  x_vector << "x = [";
+  y_vector << "y = [";
+  for (int ii = 0; ii < path.size(); ++ii) {
+    const Point &point = path[ii];
+    const char *separator = ii < path.size() - 1 ? "," : "";
+    x_vector << point.x << separator;
+    y_vector << point.y << separator;
+  }
+  x_vector << "]" << endl;
+  y_vector << "]" << endl;
+
+  cout << x_vector.str();
+  cout << y_vector.str();
+}
+
 Path MapPathToCarPath(const CarState &car, const Path &map_path) {
   Path car_path;
   car_path.reserve(map_path.size());
@@ -190,7 +214,6 @@ Path GenerateSDCPathByTimeSamples(const MapState &map_state,
 
   const int kTimeSamples = time_horizon / time_step;
   const double kMaxDistanceHorizon = time_horizon * max_speed;
-  int kNumImmutable = 30;
 
   double v = std::min(sdc_state.v(), max_speed);
   // Build a path of way points sampled from the spline waypoints (spatial).
