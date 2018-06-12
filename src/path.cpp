@@ -18,8 +18,9 @@
 
 using namespace std;
 
-void DumpPath(const char *name, const Path &path) {
+const int kImmutableSamples = 5;
 
+void DumpPath(const char *name, const Path &path) {
   cout << name << endl;
   for (const Point &point : path) {
     cout << "x=" << point.x << ";y=" << point.y << "|";
@@ -51,28 +52,31 @@ void DumpPathForUnitTest(const char *name, const Path &path) {
   cout << y_vector.str();
 }
 
-void DumpPathForPlot(const char *name, const Path &path) {
+void DumpPathForPlots(const char *name, const Path &path, ostream &stream) {
   stringstream x_vector;
   stringstream y_vector;
+  stringstream th_vector;
+  stringstream out;
 
-  x_vector.precision(10);
-  x_vector.width(10);
-  y_vector.precision(10);
-  y_vector.width(10);
+  x_vector << "x_" << name << " = [";
+  y_vector << "y_" << name << " = [";
+  th_vector << "th_" << name << " = [";
 
-  x_vector << "x = [";
-  y_vector << "y = [";
   for (int ii = 0; ii < path.size(); ++ii) {
     const Point &point = path[ii];
     const char *separator = ii < path.size() - 1 ? "," : "";
     x_vector << point.x << separator;
     y_vector << point.y << separator;
+    th_vector << point.theta << separator;
   }
   x_vector << "]" << endl;
   y_vector << "]" << endl;
+  th_vector << "]" << endl;
 
-  cout << x_vector.str();
-  cout << y_vector.str();
+  stream << x_vector.str();
+  stream << y_vector.str();
+  stream << th_vector.str();
+  stream.flush();
 }
 
 Path MapPathToCarPath(const CarState &car, const Path &map_path) {
@@ -127,13 +131,20 @@ Path PathFromVectors(const std::vector<double> &x,
 
 Path GenerateReferencePath(const Path &prev_map_path, const CarState &sdc_state,
                            std::tuple<double, double> end_path_s_d,
-                           const int target_lane, const MapState &map_state) {
+                           const int target_lane, const MapState &map_state,
+                           ostream *plots) {
   // Create a reference set of waypoints that includes the current
   // car position.
   Path path;
 
   if (prev_map_path.size() < 2) {
     // Create an initial reference path.
+    // First point is 3 m back from the car's state with theta pointing in
+    // the same direction as the car.
+    path.emplace_back(sdc_state.point().x - (cos(sdc_state.yaw_rad() * 3.0)),
+                      sdc_state.point().y - (sin(sdc_state.yaw_rad() * 3.0)),
+                      sdc_state.yaw_rad());
+
     path.emplace_back(sdc_state.point());
     double kSpacing = 30.0;
     for (int ii = 1; ii <= 3; ii++) {
@@ -154,6 +165,14 @@ Path GenerateReferencePath(const Path &prev_map_path, const CarState &sdc_state,
     double s, d;
     std::tie(s, d) = end_path_s_d;
     double path_s_length = s - sdc_state.s();
+
+    path.emplace_back(sdc_state.point());
+
+    for (int ii = 0, jj = 0;
+         ii < kImmutableSamples && ii << prev_map_path.size(); ++ii) {
+      // Maintain the existing path and speed for a fixed time.
+      path.emplace_back(prev_map_path[ii]);
+    }
 
     // Once we reach a certain length path from the previous trajectory, we
     // add in a few of these points to the spline.
@@ -177,6 +196,10 @@ Path GenerateReferencePath(const Path &prev_map_path, const CarState &sdc_state,
 
       path.push_back(point);
     }
+  }
+
+  if (plots != nullptr) {
+    DumpPathForPlots("ref", path, *plots);
   }
 
   Path car_ref_path = MapPathToCarPath(sdc_state, path);
@@ -219,11 +242,11 @@ Path GenerateSDCPathByTimeSamples(const MapState &map_state,
   // Build a path of way points sampled from the spline waypoints (spatial).
   // so they cover the Distance we want to travel in the time step.
   Path time_sampled_path;
-  const double kImmutableTime = 0.5;
+  const double kImmutableTime = 0.05;
   double x = 0.0, y = 0.0;
   for (int ii = 0, jj = 0; ii < kTimeSamples; ++ii) {
     // Maintain the existing path and speed for a fixed time.
-    if ((ii * time_step) < kImmutableTime && ii < prev_path_car.size()) {
+    if (ii < kImmutableSamples && ii < prev_path_car.size()) {
       time_sampled_path.emplace_back(prev_path_car[ii]);
       v = Distance(x, y, prev_path_car[ii].x, prev_path_car[ii].y) / time_step;
       x = prev_path_car[ii].x;
@@ -383,10 +406,11 @@ Plan GeneratePathAndCost(const std::string &plan_name,
                          const MapState &map_state,
                          std::tuple<double, double> end_path_s_d,
                          int target_lane, double accel, double max_speed,
-                         double time_step, double time_horizon) {
+                         double time_step, double time_horizon,
+                         ostream *plots) {
   // Generate a reference path for the current lane in map co-ordinates.
   Path ref_path_map = GenerateReferencePath(
-      prev_path_map, sdc_state, end_path_s_d, target_lane, map_state);
+      prev_path_map, sdc_state, end_path_s_d, target_lane, map_state, plots);
   Path drivable_path = GenerateSDCPathByTimeSamples(
       map_state, ref_path_map, prev_path_map, sdc_state, accel, max_speed,
       time_step, time_horizon);

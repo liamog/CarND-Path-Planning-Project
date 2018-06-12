@@ -14,6 +14,7 @@ typedef std::vector<Point> Path;
 void DumpPath(const char *name, const Path &path);
 void DumpPathForUnitTest(const char *name, const Path &path);
 
+void DumpPathForPlots(const char *name, const Path &path, std::ostream &stream);
 Path MapPathToCarPath(const CarState &car, const Path &map_path);
 
 Path CarPathToMapPath(const MapState &map_state, const CarState &car,
@@ -25,12 +26,13 @@ std::pair<std::vector<double>, std::vector<double>> VectorsFromPath(
 Path PathFromVectors(const std::vector<double> &x,
                      const std::vector<double> &y);
 
-// Generates a reference path (without taking the speed of the car into account)
-// This is a sparse set of waypoints that should be smoothed out at a later
-// stage with a spline.
+// Generates a reference path (without taking the speed of the car into
+// account) This is a sparse set of waypoints that should be smoothed out at a
+// later stage with a spline.
 Path GenerateReferencePath(const Path &prev_path, const CarState &sdc_state,
                            std::tuple<double, double> end_path_s_d,
-                           const int target_lane, const MapState &map_state);
+                           const int target_lane, const MapState &map_state,
+                           std::ostream *plots);
 
 // Generate a path for the SDC from the previous path + the reference path
 // + current SDC state, given a time step and time horizon a constant accel
@@ -62,7 +64,7 @@ Plan GeneratePathAndCost(const std::string &name, const Path &prev_path_map,
                          std::tuple<double, double> end_path_s_d,
                          int target_lane, const double accel,
                          const double max_speed, double time_step,
-                         double time_horizon);
+                         double time_horizon, std::ostream *plots_data);
 
 std::vector<std::tuple<double, double, double>> CalculateSpeedDerivatives(
     const Path &drivable_path, double time_step);

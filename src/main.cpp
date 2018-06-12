@@ -51,13 +51,14 @@ int main() {
   ofstream car_state_stream("car_state.csv");
   car_state_stream << CarState::CsvStringHeader() << endl;
 
+  ofstream plots_data("../plots.py");
   //  ofstream refpath_stream("ref_path.csv");
+
   //
   int count = 0;
-  h.onMessage([&map_state, &car_state_stream, &count](
-      uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
-      uWS::OpCode opCode) {
-
+  h.onMessage([&map_state, &car_state_stream, &count, &plots_data](
+                  uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+                  uWS::OpCode opCode) {
     constexpr double kTimeStep = 1.0 / 50.0;
     constexpr double kTimeHorizon = 2.0;
     // "42" at the start of the message means there's a websocket message event.
@@ -96,11 +97,14 @@ int main() {
           auto previous_path_y = j[1]["previous_path_y"];
           Path prev_path_map =
               PathFromVectors(previous_path_x, previous_path_y);
-          DumpPathForUnitTest("prev_path_map", prev_path_map);
+
+          stringstream prev_name;
+          prev_name << "prev_" << count;
+          DumpPathForPlots(prev_name.str().c_str(), prev_path_map, plots_data);
 
           auto derivatives =
               CalculateSpeedDerivatives(prev_path_map, kTimeStep);
-          int count = 0;
+
           for (const auto &sample : derivatives) {
             double speed, accel, jerk;
             std::tie(speed, accel, jerk) = sample;
@@ -110,7 +114,6 @@ int main() {
               cout << " incoming  WARNING accel too high " << accel << endl;
             if (jerk > 10.0)
               cout << "incoming  WARNING jerk too high " << jerk << endl;
-            ++count;
           }
 
           // Previous path's end s and d values
@@ -163,27 +166,35 @@ int main() {
               plans.push(GeneratePathAndCost(
                   "Accel:1", prev_path_map, sdc_state, others, map_state,
                   end_path_s_d, lane, kMaxAccel, kMaxSpeed, kTimeStep,
-                  kTimeHorizon));
+                  kTimeHorizon, nullptr));
             }
           } else {
             // Accel
-            plans.push(GeneratePathAndCost("Accel:1", prev_path_map, sdc_state,
-                                           others, map_state, end_path_s_d,
-                                           sdc_state.Lane(), kMaxAccel,
-                                           kMaxSpeed, kTimeStep, kTimeHorizon));
+            plans.push(GeneratePathAndCost(
+                "Accel:1", prev_path_map, sdc_state, others, map_state,
+                end_path_s_d, sdc_state.Lane(), kMaxAccel, kMaxSpeed, kTimeStep,
+                kTimeHorizon, nullptr));
           }
+          Path ref_path_map = GenerateReferencePath(
+              prev_path_map, sdc_state, end_path_s_d,  sdc_state.Lane(), map_state,
+              nullptr);
+          stringstream ref_name;
+          ref_name << "ref_" << count;
+          DumpPathForPlots(ref_name.str().c_str(), ref_path_map,
+                           plots_data);
+
 
           // Maintain speed in current lane
           plans.push(GeneratePathAndCost("Maintain:1", prev_path_map, sdc_state,
                                          others, map_state, end_path_s_d,
                                          sdc_state.Lane(), kNoAccel, kMaxSpeed,
-                                         kTimeStep, kTimeHorizon));
+                                         kTimeStep, kTimeHorizon, nullptr));
 
           // Brake in current lane
           plans.push(GeneratePathAndCost("brake:1", prev_path_map, sdc_state,
                                          others, map_state, end_path_s_d,
                                          sdc_state.Lane(), kMinAccel, kMaxSpeed,
-                                         kTimeStep, kTimeHorizon));
+                                         kTimeStep, kTimeHorizon, nullptr));
 
           cout << "Selected " << get<0>(plans.top());
           auto derivatives_new =
@@ -198,15 +209,18 @@ int main() {
             if (jerk > 10.0)
               cout << "outgoing WARNING jerk too high " << jerk << endl;
           }
-          DumpPathForUnitTest("NextPath", get<2>(plans.top()));
+          stringstream next_name;
+          next_name << "next_" << count;
+          DumpPathForPlots(next_name.str().c_str(), get<2>(plans.top()),
+                           plots_data);
 
-          std::pair<vector<double>, vector<double>> next =
+          auto next_path =
               VectorsFromPath(get<2>(plans.top()));
 
           // TODO: define a path made up of (x,y) points that the car will visit
           // sequentially every .02 seconds
-          msgJson["next_x"] = next.first;
-          msgJson["next_y"] = next.second;
+          msgJson["next_x"] = next_path.first;
+          msgJson["next_y"] = next_path.second;
 
           auto msg = "42[\"control\"," + msgJson.dump() + "]";
 
