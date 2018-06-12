@@ -15,7 +15,7 @@ CarState::CarState(double x, double y, double s, double d, double v,
 
 // Constructor for other road users.
 CarState::CarState(double x, double y, double s, double d, double v)
-    :point_(x, y, 0.0, s, d), v_(v) {
+    : point_(x, y, 0.0, s, d), v_(v) {
   lane_ = frenet_d_to_lane(d);
 }
 
@@ -32,7 +32,15 @@ std::string CarState::ToString() const {
 std::string CarState::ToCsvString() const {
   std::stringstream retval;
   retval << s() << "," << d() << "," << point_.x << "," << point_.y << "," << v_
-         << "," << point_.theta << "," << rad_to_deg(point_.theta) << "," << Lane();
+         << "," << point_.theta << "," << rad_to_deg(point_.theta) << ","
+         << Lane();
+  return retval.str();
+}
+
+std::string CarState::ToCodeString() const {
+  std::stringstream retval;
+  retval << "CarState state(" << point_.x << "," << point_.y << "," << s()
+         << "," << d() << "," << v_ << "," << point_.theta << ");";
   return retval.str();
 }
 
@@ -67,5 +75,5 @@ std::vector<int> CarState::GetPossibleLanes() {
   if (Lane() - 1 >= 0) {
     possible_lanes.push_back(Lane() - 1);
   }
-  return  possible_lanes;
+  return possible_lanes;
 }

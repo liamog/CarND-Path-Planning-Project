@@ -40,6 +40,7 @@ string hasData(string s) {
 }
 
 int main() {
+  cout.precision(8);
   uWS::Hub h;
   double reference_velocity_mps = mph_to_mps(45);  // 49.5 mph in m/s
 
@@ -56,7 +57,8 @@ int main() {
   h.onMessage([&map_state, &car_state_stream, &count](
       uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
       uWS::OpCode opCode) {
-    constexpr double kTimeStep = 1.0 / 50;
+
+    constexpr double kTimeStep = 1.0 / 50.0;
     constexpr double kTimeHorizon = 2.0;
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -65,7 +67,7 @@ int main() {
     // cout << sdata << endl;
     if (length && length > 2 && data[0] == '4' && data[1] == '2') {
       auto s = hasData(data);
-
+      cout << s;
       if (s != "") {
         cout << "-----------------------------------iteration " << count++
              << endl;
@@ -87,18 +89,32 @@ int main() {
 
           car_state_stream << sdc_state.ToCsvString() << endl;
           car_state_stream.flush();
+          cout << sdc_state.ToCodeString() << endl;
 
           // Previous path data given to the Planner
           auto previous_path_x = j[1]["previous_path_x"];
           auto previous_path_y = j[1]["previous_path_y"];
           Path prev_path_map =
               PathFromVectors(previous_path_x, previous_path_y);
-          DumpPath("prev_path_map", prev_path_map);
+          DumpPathForUnitTest("prev_path_map", prev_path_map);
+
+          auto derivatives = CalculateSpeedDerivatives(prev_path_map, kTimeStep);
+          int count = 0;
+          for (const auto &sample : derivatives) {
+            double speed, accel, jerk;
+            std::tie(speed, accel, jerk) = sample;
+            assert(speed <  mph_to_mps(50.0));
+            assert(accel < 10.0);
+            assert(jerk < 10.0);
+            ++count;
+          }
 
           // Previous path's end s and d values
           double end_path_s = j[1]["end_path_s"];
           double end_path_d = j[1]["end_path_d"];
           std::tuple<double, double> end_path_s_d(end_path_s, end_path_d);
+          cout << "double end_path_s = " << end_path_s << ";" << endl;
+          cout << "double end_path_d = " << end_path_d << ";" << endl;
           // Sensor Fusion Data, a list of all other cars on the same side of
           // the road.
           std::vector<Path> others;
@@ -121,7 +137,7 @@ int main() {
 
           json msgJson;
 
-          double kMaxAccel = 6.0;
+          double kMaxAccel = 3.0;
           double kNoAccel = 0.0;
           double kMinAccel = -3.0;
           double kMaxSpeed = mph_to_mps(45);
@@ -133,30 +149,53 @@ int main() {
 
           std::priority_queue<Plan, std::deque<Plan>, decltype(cmp)> plans(cmp);
 
-          vector<int> lanes = sdc_state.GetPossibleLanes();
+          constexpr bool enabled_lane_change = false;
 
-          for (int lane : lanes) {
+          if (enabled_lane_change) {
+            vector<int> lanes = sdc_state.GetPossibleLanes();
+
+            for (int lane : lanes) {
               // Accel
               plans.push(GeneratePathAndCost(
-                      "Accel:1", prev_path_map, sdc_state, others, map_state,
-                      end_path_s_d, lane, kMaxAccel, kMaxSpeed, kTimeStep,
-                      kTimeHorizon));
+                  "Accel:1", prev_path_map, sdc_state, others, map_state,
+                  end_path_s_d, lane, kMaxAccel, kMaxSpeed, kTimeStep,
+                  kTimeHorizon));
+            }
+          } else {
+            // Accel
+            plans.push(GeneratePathAndCost(
+                "Accel:1", prev_path_map, sdc_state, others, map_state,
+                end_path_s_d, sdc_state.Lane(), kMaxAccel, kMaxSpeed, kTimeStep,
+                kTimeHorizon));
+
           }
-          // Maintain speed
+
+          // Maintain speed in current lane
           plans.push(GeneratePathAndCost(
               "Maintain:1", prev_path_map, sdc_state, others, map_state,
               end_path_s_d, sdc_state.Lane(), kNoAccel, kMaxSpeed, kTimeStep,
               kTimeHorizon));
 
-          // Brake
+          // Brake in current lane
           plans.push(GeneratePathAndCost(
               "brake:1", prev_path_map, sdc_state, others, map_state,
               end_path_s_d, sdc_state.Lane(), kMinAccel, kMaxSpeed, kTimeStep,
               kTimeHorizon));
 
           cout << "Selected " << get<0>(plans.top());
+          auto derivatives_new = CalculateSpeedDerivatives(get<2>(plans.top()), kTimeStep);
+          for (const auto &sample : derivatives_new) {
+            double speed, accel, jerk;
+            std::tie(speed, accel, jerk) = sample;
+            assert(speed <  mph_to_mps(50.0));
+            assert(accel < 10.0);
+            assert(jerk < 10.0);
+          }
+          DumpPathForUnitTest("NextPath", get<2>(plans.top()));
+
           std::pair<vector<double>, vector<double>> next =
               VectorsFromPath(get<2>(plans.top()));
+
           // TODO: define a path made up of (x,y) points that the car will visit
           // sequentially every .02 seconds
           msgJson["next_x"] = next.first;

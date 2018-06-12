@@ -20,13 +20,14 @@ class CarState {
 
   double s() const { return point_.s; }
   double d() const { return point_.d; }
-  double yaw_rad() const { return point_.theta;}
+  double yaw_rad() const { return point_.theta; }
   double v() const { return v_; }
   const Point &point() const { return point_; }
   int Lane() const;
 
   std::string ToString() const;
   std::string ToCsvString() const;
+  std::string ToCodeString() const;
   static std::string CsvStringHeader();
 
   std::vector<int> GetPossibleLanes();

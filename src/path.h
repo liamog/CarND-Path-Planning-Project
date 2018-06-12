@@ -12,6 +12,7 @@
 typedef std::vector<Point> Path;
 
 void DumpPath(const char *name, const Path &path);
+void DumpPathForUnitTest(const char *name, const Path &path);
 
 Path MapPathToCarPath(const CarState &car, const Path &map_path);
 
@@ -62,5 +63,8 @@ Plan GeneratePathAndCost(const std::string &name, const Path &prev_path_map,
                          int target_lane, const double accel,
                          const double max_speed, double time_step,
                          double time_horizon);
+
+std::vector<std::tuple<double, double, double>> CalculateSpeedDerivatives(
+    const Path &drivable_path, double time_step);
 
 #endif  // PATH_PLANNING_PATH_H

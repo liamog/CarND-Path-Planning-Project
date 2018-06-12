@@ -8,6 +8,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <tuple>
 #include <vector>
 
@@ -18,11 +19,36 @@
 using namespace std;
 
 void DumpPath(const char *name, const Path &path) {
+
   cout << name << endl;
   for (const Point &point : path) {
     cout << "x=" << point.x << ";y=" << point.y << "|";
   }
   cout << endl;
+}
+
+void DumpPathForUnitTest(const char *name, const Path &path) {
+  stringstream x_vector;
+  stringstream y_vector;
+
+  x_vector.precision(10);
+  x_vector.width(10);
+  y_vector.precision(10);
+  y_vector.width(10);
+
+  x_vector << "std::vector<double> x = {";
+  y_vector << "std::vector<double> y = {";
+  for (int ii = 0; ii < path.size(); ++ii) {
+    const Point &point = path[ii];
+    const char *separator = ii < path.size() - 1 ? "," : "";
+    x_vector << point.x << separator;
+    y_vector << point.y << separator;
+  }
+  x_vector << "};" << endl;
+  y_vector << "};" << endl;
+
+  cout << x_vector.str();
+  cout << y_vector.str();
 }
 
 Path MapPathToCarPath(const CarState &car, const Path &map_path) {
@@ -68,8 +94,8 @@ Path PathFromVectors(const std::vector<double> &x,
   points.reserve(x.size());
   for (int ii = 0; ii < x.size(); ++ii) {
     double theta = (ii < x.size() - 1)
-                       ? points[ii - 1].theta
-                       : atan2(y[ii + 1] - y[ii], x[ii + 1] - x[ii]);
+                       ? atan2(y[ii + 1] - y[ii], x[ii + 1] - x[ii])
+                       : points[ii - 1].theta;
     points.emplace_back(x[ii], y[ii], theta);
   }
   return points;
@@ -170,9 +196,11 @@ Path GenerateSDCPathByTimeSamples(const MapState &map_state,
   // Build a path of way points sampled from the spline waypoints (spatial).
   // so they cover the Distance we want to travel in the time step.
   Path time_sampled_path;
+  const double kImmutableTime = 0.5;
   double x = 0.0, y = 0.0;
   for (int ii = 0, jj = 0; ii < kTimeSamples; ++ii) {
-    if (ii < prev_path_car.size()) {
+    // Maintain the existing path and speed for a fixed time.
+    if ((ii * time_step) < kImmutableTime && ii < prev_path_car.size()) {
       time_sampled_path.emplace_back(prev_path_car[ii]);
       v = Distance(x, y, prev_path_car[ii].x, prev_path_car[ii].y) / time_step;
       x = prev_path_car[ii].x;
@@ -222,28 +250,30 @@ Path GenerateOtherPathByTimeSamples(const CarState &other_state,
   return path;
 }
 
-double PathCost(const CarState &sdc_state, const Path &sdc_path,
-                const std::vector<Path> &others, const double time_step) {
-  // Adjust these weights and maxes so the cost function will choose
-  // the most optimal path for progress and safety.
-  constexpr double kProximityCostWeight = 50.0;
-  constexpr double kMaxProximityFactor = 500.0;
+class CostComponent {
+ public:
+  CostComponent(double factor, double weight, double max_factor)
+      : factor_(factor), weight_(weight), max_factor_(max_factor) {}
+  double Cost() const { return std::min(factor_, max_factor_) * weight_; }
 
-  constexpr double kCollisionCostWeight = 100.0;
-  constexpr double kMaxCollisionFactor = 1000.0;
+  std::string ToString() const {
+    std::stringstream retval;
+    retval << Cost() << "(f=" << factor_ << ";w=" << weight_
+           << ";m=" << max_factor_ << ")";
+    return retval.str();
+  }
 
-  constexpr double kDistanceTravelledCostWeight = 1.0;
-  constexpr double kMaxDistanceTravelledFactor = 100.0;
+ private:
+  double factor_ = 0.0;
+  const double weight_;
+  const double max_factor_;
+};
 
-  constexpr double kMinDistanceTimeWeight = 10.0;
-  constexpr double kMaxDistanceTimeFactor = 10.0;
-
-  // NOTE: Incoming paths should be time sampled paths of the same size.
-
-  //  This cost is relative to the cartesian Distance between us and them over
-  //  time. We only incur this if we get within 10m.
-  double min_distance = std::numeric_limits<double>::infinity();
-  double min_distance_time = 0;
+double CalculateCollisionCost(const Path &sdc_path,
+                              const std::vector<Path> &others,
+                              const double time_step) {
+  //  Collision cost is high and higher if more imminent.
+  double collision_factor = 0.0;
   for (int ii = 0; ii < sdc_path.size(); ii += 1) {
     for (const Path &other_path : others) {
       // Assume that the other car is following it's lane from it's current
@@ -251,13 +281,18 @@ double PathCost(const CarState &sdc_state, const Path &sdc_path,
       // Then compare this with our location.
       const double dist = Distance(other_path[ii], sdc_path[ii]);
       // If we get within 10 meters of another vehicle, then take a cost.
-      if (dist < 10.0 && dist < min_distance) {
-        min_distance_time = ii * time_step;
-        min_distance = dist;
+      if (dist < 1.0) {
+        return 1.0 / (ii * time_step);
       }
     }
   }
+  return 0.0;
+}
 
+double CalculateDistanceToLeadCost(const Path &sdc_path,
+                                   const std::vector<Path> &others,
+                                   const double time_step,
+                                   const double too_close_threshold) {
   // This value is the distance to car ahead in lane, it only captures the
   // min distance if the states are in the same lane, so it will capture
   // a lane change behind another vehicle.
@@ -274,50 +309,49 @@ double PathCost(const CarState &sdc_state, const Path &sdc_path,
       if (dist < 0.0) continue;
 
       // If we get within 10 meters of another vehicle, then take a cost.
-      if (dist < 10.0 && dist < min_distance) {
-        in_lane_min_proximity_time = ii * time_step;
-        in_lane_proximity = dist;
+      if (dist < too_close_threshold) {
+        return 1.0 / (ii * time_step);
       }
     }
   }
+  return 0.0;
+}
 
-  if (min_distance < 1.0) {
-    // We have a collision.
+double PathCost(const CarState &sdc_state, const Path &sdc_path,
+                const std::vector<Path> &others, const double time_step) {
+  constexpr double kEpsilon = 0.00001;
+  // Adjust these weights and maxes so the cost function will choose
+  // the most optimal path for progress and safety.
+  const double collision = CalculateCollisionCost(sdc_path, others, time_step);
+  const double close_to_lead = CalculateDistanceToLeadCost(
+      sdc_path, others, time_step, /*too_close_threshold=*/10.0);
+  const double lane_changed_factor =
+      frenet_d_to_lane(sdc_path.back().d) !=
+              frenet_d_to_lane(sdc_path.front().d)
+          ? 1.0
+          : 0.0;
 
-  }
+  // Calculate total distance travelled in our lanes, cost will be inversely
+  // proportional so make sure we don't divide by zero.
+  const double distance_travelled =
+      std::max(sdc_path.back().s - sdc_path.front().s, kEpsilon);
 
-  // Calculate total Distance travelled.
-  const double distance_travelled = sdc_path.back().s - sdc_path.front().s;
+  CostComponent collision_cost(collision, 1000.0, 100.0);
+  CostComponent dist_to_lead_cost(close_to_lead, 10.0, 100.0);
+  CostComponent lane_change_cost(lane_changed_factor, 1.0, 1.0);
+  CostComponent distance_travelled_cost(1.0 / distance_travelled, 10.0, 100.0);
+  const double total_cost = collision_cost.Cost() + dist_to_lead_cost.Cost() +
+                            lane_change_cost.Cost() +
+                            distance_travelled_cost.Cost();
 
-  // Have a cost for changing lanes.
-
-  const double min_distance_factor =
-      std::min(kMaxProximityFactor, 1.0 / min_distance);
-  const double min_distance_time_factor =
-      std::min(kMaxDistanceTimeFactor, 1.0 / min_distance_time);
-  const double distance_travelled_factor =
-      std::min(kMaxDistanceTravelledFactor, 1.0 / distance_travelled);
-
-  const double min_dist_to_car_cost =
-      min_distance_factor * kProximityCostWeight;
-  const double min_distance_time_cost =
-      min_distance_time_factor * kMinDistanceTimeWeight;
-  const double distance_travelled_cost =
-      distance_travelled_factor * kDistanceTravelledCostWeight;
-
-  cout << "COST:"
-       << "min_dist_to_car:" << min_distance << ",f(" << min_distance_factor
-       << "),c(" << min_dist_to_car_cost << ")" << endl
-       << "\t"
-       << "time_to_min_dist:" << min_distance_time * .02 << ",f("
-       << min_distance_time_factor << "),c(" << min_distance_time_cost << endl
-       << "\t"
-       << "distance_travelled:" << distance_travelled << ",f("
-       << distance_travelled_factor << "),c(" << distance_travelled_cost << ")"
+  cout << "COST:" << total_cost << "-"
+       << "collision_cost:" << collision_cost.ToString() << "|"
+       << "dist_to_lead_cost:" << dist_to_lead_cost.ToString() << "|"
+       << "lane_change_cost:" << lane_change_cost.ToString() << "|"
+       << "distance_travelled_cost:" << distance_travelled_cost.ToString()
        << endl;
 
-  return min_dist_to_car_cost + distance_travelled_cost +
-         min_distance_time_cost;
+  return total_cost;
 }
 
 Plan GeneratePathAndCost(const std::string &plan_name,
@@ -338,3 +372,31 @@ Plan GeneratePathAndCost(const std::string &plan_name,
   cout << plan_name << " cost = " << path_cost << endl;
   return std::make_tuple(plan_name, path_cost, drivable_path);
 };
+
+std::vector<std::tuple<double, double, double>> CalculateSpeedDerivatives(
+    const Path &drivable_path, double time_step) {
+  std::vector<std::tuple<double, double, double>> path_derivatives;
+  if (drivable_path.empty()) return path_derivatives;
+  path_derivatives.reserve(drivable_path.size() - 4);
+  for (int ii = 0; ii < drivable_path.size() - 4; ++ii) {
+    const Point &point_1 = drivable_path[ii];
+    const Point &point_2 = drivable_path[ii + 1];
+    const Point &point_3 = drivable_path[ii + 2];
+    const Point &point_4 = drivable_path[ii + 3];
+
+    const double speed_1 = Distance(point_1, point_2) / time_step;
+    const double speed_2 = Distance(point_2, point_3) / time_step;
+    const double speed_3 = Distance(point_3, point_4) / time_step;
+
+    const double accel_1 = (speed_2 - speed_1) / time_step;
+    const double accel_2 = (speed_3 - speed_2) / time_step;
+
+    const double jerk = (accel_2 - accel_1) / time_step;
+
+    //    std::cout << "v=" << speed_1 << ";Accel=" << accel_1 << ";Jerk=" <<
+    //    jerk
+    //              << std::endl;
+    path_derivatives.emplace_back(speed_1, accel_1, jerk);
+  }
+  return path_derivatives;
+}
