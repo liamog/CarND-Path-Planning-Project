@@ -205,9 +205,9 @@ Path GenerateSDCPathByTimeSamples(const MapState &map_state,
                                   double max_speed, double time_step,
                                   double time_horizon) {
   Path prev_path_car = MapPathToCarPath(sdc_state, prev_path_map);
-  //  DumpPath("prev_path_car", prev_path_car);
+  DumpPath("prev_path_car", prev_path_car);
   Path ref_path_car = MapPathToCarPath(sdc_state, ref_path_map);
-  // DumpPath("ref_path_car", ref_path_car);
+  DumpPath("ref_path_car", ref_path_car);
   tk::spline spline;
   pair<vector<double>, vector<double>> ref = VectorsFromPath(ref_path_car);
   spline.set_points(ref.first, ref.second);
